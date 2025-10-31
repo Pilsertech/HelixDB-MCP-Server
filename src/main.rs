@@ -1,4 +1,4 @@
-﻿use anyhow::Result;
+use anyhow::Result;
 use rmcp::{tool_router, tool, tool_handler, ServerHandler, serve_server, schemars, transport::stdio};
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -16,7 +16,6 @@ mod embedding_client;
 
 use helix_client::HelixClient;
 use config::Config;
-use embedding_client::EmbeddingClient;
 
 // ============================================================================
 // HIGH-LEVEL DOMAIN-SPECIFIC TOOL PARAMETERS
@@ -458,13 +457,16 @@ impl HelixMcpServer {
                     }
                 }
                 Some(config::EmbeddingProvider::Local) => {
-                    info!("Using local embedding provider (no API key needed)");
+                    info!("Using local HTTP embedding provider (no API key needed)");
+                }
+                Some(config::EmbeddingProvider::Tcp) => {
+                    info!("Using TCP embedding server (no API key needed)");
                 }
                 None => {
                     error!("Embedding provider not configured");
                     return Ok(CallToolResult::structured_error(json!({
                         "error": "Embedding provider not configured",
-                        "suggestion": "Set 'provider' in mcpconfig.toml to: openai, gemini, or local"
+                        "suggestion": "Set 'provider' in mcpconfig.toml to: openai, gemini, local, or tcp"
                     })));
                 }
             }
@@ -473,11 +475,11 @@ impl HelixMcpServer {
             info!("Generating embedding for query: {}", query);
             let query_embedding = match self.generate_embedding(query, &api_key).await {
                 Ok(embedding) => {
-                    info!("✓ Generated embedding vector with {} dimensions", embedding.len());
+                    info!("? Generated embedding vector with {} dimensions", embedding.len());
                     embedding
                 }
                 Err(e) => {
-                    error!("✗ Failed to generate embedding: {}", e);
+                    error!("? Failed to generate embedding: {}", e);
                     return Ok(CallToolResult::structured_error(json!({
                         "error": format!("Embedding generation failed: {}", e),
                         "provider": format!("{:?}", self.config.embedding.provider),
@@ -698,7 +700,7 @@ impl HelixMcpServer {
             // Generate embedding
             match self.generate_embedding(text_description, &api_key).await {
                 Ok(embedding) => {
-                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    info!("? Generated {} dimensional embedding", embedding.len());
                     
                     // Add embedding to data
                     data["embedding"] = json!(embedding);
@@ -709,12 +711,13 @@ impl HelixMcpServer {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
                         }
                         Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
                         None => "unknown".to_string()
                     };
                     data["embedding_model"] = json!(model_name);
                 }
                 Err(e) => {
-                    error!("✗ Failed to generate embedding: {}", e);
+                    error!("? Failed to generate embedding: {}", e);
                     return Ok(CallToolResult::structured_error(json!({
                         "error": format!("Failed to generate embedding: {}", e),
                         "suggestion": "Check embedding configuration and API connectivity"
@@ -785,7 +788,7 @@ impl HelixMcpServer {
             // Generate embedding
             match self.generate_embedding(text_description, &api_key).await {
                 Ok(embedding) => {
-                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    info!("? Generated {} dimensional embedding", embedding.len());
                     
                     // Add embedding to data
                     data["embedding"] = json!(embedding);
@@ -796,12 +799,13 @@ impl HelixMcpServer {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
                         }
                         Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
                         None => "unknown".to_string()
                     };
                     data["embedding_model"] = json!(model_name);
                 }
                 Err(e) => {
-                    error!("✗ Failed to generate embedding: {}", e);
+                    error!("? Failed to generate embedding: {}", e);
                     return Ok(CallToolResult::structured_error(json!({
                         "error": format!("Failed to generate embedding: {}", e),
                         "suggestion": "Check embedding configuration and API connectivity"
@@ -1375,6 +1379,9 @@ impl HelixMcpServer {
             EmbeddingProvider::Local => {
                 self.generate_local_embedding(text).await
             }
+            EmbeddingProvider::Tcp => {
+                self.generate_tcp_embedding(text).await
+            }
         }
     }
 
@@ -1501,6 +1508,26 @@ impl HelixMcpServer {
             "Invalid local API response. Expected: [0.1, 0.2, ...] or {{\"embedding\": [...]}} or {{\"vector\": [...]}}. Got: {}",
             serde_json::to_string(&json_response).unwrap_or_default().chars().take(200).collect::<String>()
         ))
+    }
+
+    async fn generate_tcp_embedding(&self, text: &str) -> Result<Vec<f32>, String> {
+        let tcp_addr = self.config.embedding.tcp_address.as_ref()
+            .ok_or("TCP address not configured in mcpconfig.toml")?;
+
+        info!("Generating TCP embedding at {}", tcp_addr);
+
+        // Use the embedding_client module
+        let client = embedding_client::EmbeddingClient::new(
+            tcp_addr.clone(), 
+            self.config.embedding.tcp_timeout_secs
+        );
+
+        // Connect and generate embedding
+        let embedding = client.embed_text(text).await
+            .map_err(|e| format!("TCP embedding request failed: {}", e))?;
+
+        info!("TCP embedding generated: {} dimensions", embedding.len());
+        Ok(embedding)
     }
 }
 
@@ -1780,6 +1807,19 @@ async fn test_local_embedding_connection(url: &str) -> Result<()> {
     }
 }
 
+async fn test_tcp_embedding_connection(addr: &str, timeout_secs: u64) -> Result<()> {
+    let timeout = timeout_secs.min(10); // Cap at 10 seconds for connection test
+    
+    // Try to connect to TCP server and send a test request
+    let client = embedding_client::EmbeddingClient::new(addr.to_string(), timeout);
+    
+    // Try a simple test embedding
+    let _result = client.embed_text("connection test").await
+        .map_err(|e| anyhow::anyhow!("TCP test request failed: {}", e))?;
+    
+    Ok(())
+}
+
 async fn async_main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -1812,14 +1852,14 @@ async fn async_main() -> Result<()> {
                 // Check API key for cloud providers
                 let api_key = config.get_api_key();
                 if api_key.is_some() {
-                    info!("   API Key: ✓ Configured");
+                    info!("   API Key: ? Configured");
                     let api_url = config.embedding.openai_api_url.as_ref()
                         .or(config.embedding.gemini_api_url.as_ref());
                     if let Some(url) = api_url {
                         info!("   API URL: {}", url);
                     }
                 } else {
-                    error!("   API Key: ✗ MISSING!");
+                    error!("   API Key: ? MISSING!");
                     error!("   Please set OPENAI_API_KEY or GEMINI_API_KEY environment variable");
                     error!("   Or add 'api_key' to mcpconfig.toml [embedding] section");
                     anyhow::bail!("API key required for cloud embedding providers");
@@ -1835,23 +1875,48 @@ async fn async_main() -> Result<()> {
                     // Test connection to local server
                     match test_local_embedding_connection(url).await {
                         Ok(()) => {
-                            info!("   ✓ Local embedding server is reachable");
+                            info!("   ? Local embedding server is reachable");
                         }
                         Err(e) => {
-                            error!("   ✗ Cannot connect to local embedding server: {}", e);
+                            error!("   ? Cannot connect to local embedding server: {}", e);
                             error!("   Make sure your local embedding server is running at {}", url);
                             error!("   Example: python local_server.py or ollama serve");
                             anyhow::bail!("Local embedding server not reachable");
                         }
                     }
                 } else {
-                    error!("   Local API URL: ✗ NOT CONFIGURED");
+                    error!("   Local API URL: ? NOT CONFIGURED");
                     error!("   Please set 'local_api_url' in mcpconfig.toml [embedding] section");
                     anyhow::bail!("Local API URL required for local embedding provider");
                 }
             }
+            Some(config::EmbeddingProvider::Tcp) => {
+                // Check TCP connection
+                let tcp_addr = config.embedding.tcp_address.as_ref();
+                if let Some(addr) = tcp_addr {
+                    info!("   TCP Address: {}", addr);
+                    info!("   Testing TCP embedding server connection...");
+                    
+                    // Test connection to TCP server
+                    match test_tcp_embedding_connection(addr, config.embedding.tcp_timeout_secs).await {
+                        Ok(()) => {
+                            info!("   ? TCP embedding server is reachable");
+                        }
+                        Err(e) => {
+                            error!("   ? Cannot connect to TCP embedding server: {}", e);
+                            error!("   Make sure EmbeddingServer is running at {}", addr);
+                            error!("   Example: cd EmbeddingServer && cargo run");
+                            anyhow::bail!("TCP embedding server not reachable");
+                        }
+                    }
+                } else {
+                    error!("   TCP Address: ? NOT CONFIGURED");
+                    error!("   Please set 'tcp_address' in mcpconfig.toml [embedding] section");
+                    anyhow::bail!("TCP address required for TCP embedding provider");
+                }
+            }
             None => {
-                error!("   Provider: ✗ NOT CONFIGURED");
+                error!("   Provider: ? NOT CONFIGURED");
                 error!("   Please set 'provider' in mcpconfig.toml to: openai, gemini, or local");
                 anyhow::bail!("Embedding provider not configured");
             }

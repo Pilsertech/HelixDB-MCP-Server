@@ -40,6 +40,15 @@ pub struct EmbeddingConfig {
     pub api_key: Option<String>,
     #[serde(default = "default_dimensions")]
     pub dimensions: usize,
+    // TCP embedding server configuration
+    #[serde(default)]
+    pub tcp_address: Option<String>,
+    #[serde(default = "default_tcp_timeout")]
+    pub tcp_timeout_secs: u64,
+}
+
+fn default_tcp_timeout() -> u64 {
+    30
 }
 
 fn default_dimensions() -> usize {
@@ -59,6 +68,7 @@ pub enum EmbeddingProvider {
     OpenAI,
     Gemini,
     Local,
+    Tcp,  // Direct TCP connection to EmbeddingServer
 }
 
 impl Config {
@@ -97,7 +107,7 @@ impl Config {
             Some(EmbeddingProvider::Gemini) => {
                 std::env::var("GEMINI_API_KEY").ok()
             }
-            Some(EmbeddingProvider::Local) | None => None,
+            Some(EmbeddingProvider::Local) | Some(EmbeddingProvider::Tcp) | None => None,
         }
     }
 
@@ -122,6 +132,9 @@ impl Config {
             }
             Some(EmbeddingProvider::Local) => {
                 self.embedding.local_api_url.clone()
+            }
+            Some(EmbeddingProvider::Tcp) => {
+                self.embedding.tcp_address.clone()
             }
             None => None,
         }
@@ -148,6 +161,8 @@ impl Default for Config {
                 local_api_url: None,
                 api_key: None,
                 dimensions: 1536,
+                tcp_address: None,
+                tcp_timeout_secs: 30,
             },
         }
     }

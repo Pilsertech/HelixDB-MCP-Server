@@ -214,7 +214,11 @@ mod tests {
     #[tokio::test]
     #[ignore] // Only run when server is running
     async fn test_embed_text() {
-        let client = EmbeddingClient::new("127.0.0.1:8787".to_string(), 30);
+        // Load from config or use default
+        let address = std::env::var("TCP_EMBEDDING_ADDRESS")
+            .unwrap_or_else(|_| "127.0.0.1:8787".to_string());
+        
+        let client = EmbeddingClient::new(address, 30);
         let result = client.embed_text("Hello, world!").await;
         assert!(result.is_ok());
         let embedding = result.unwrap();
