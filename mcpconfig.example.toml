@@ -1,0 +1,54 @@
+# Example MCP Server Configuration
+# Copy this to mcpconfig.toml and customize
+
+[server]
+name = "AI Memory Layer MCP Server"
+version = "0.1.0"
+
+[helix]
+# HelixDB connection settings
+endpoint = "127.0.0.1"
+port = 6969
+
+# ============================================================================
+# EMBEDDING CONFIGURATION - Choose your mode
+# ============================================================================
+
+[embedding]
+# OPTION 1: HelixDB Mode (Recommended for most users)
+# ----------------------------------------------------
+# Uncomment below for HelixDB to handle embeddings
+mode = "helixdb"
+
+# Additional steps for helixdb mode:
+# 1. Edit your helix.toml and add: embedding_model = "text-embedding-ada-002"
+# 2. Set environment variable: $env:OPENAI_API_KEY = "sk-..."
+# 3. Update queries to use Embed(text_description)
+# 4. Restart HelixDB with: helix deploy
+
+
+# OPTION 2: MCP Mode (Advanced - Currently TODO)
+# -----------------------------------------------
+# Uncomment below for MCP server to handle embeddings
+# mode = "mcp"
+# provider = "openai"  # Options: "openai", "gemini", "local"
+# model = "text-embedding-3-small"
+# api_key = ""  # Leave empty to use OPENAI_API_KEY env variable
+# dimensions = 1536
+
+# Note: MCP mode requires implementation of embedding generation in Rust
+# For now, use helixdb mode which is fully functional
+
+
+# ============================================================================
+# QUICK START GUIDE
+# ============================================================================
+# 
+# 1. Copy this file to mcpconfig.toml
+# 2. Keep mode = "helixdb" (already set above)
+# 3. Add to your helix.toml: embedding_model = "text-embedding-ada-002"
+# 4. Set API key: $env:OPENAI_API_KEY = "sk-proj-..."
+# 5. Start the server
+# 
+# That's it! Semantic search will work automatically.
+# ============================================================================

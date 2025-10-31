@@ -1,0 +1,46 @@
+[package]
+name = "helix-mcp-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "helix-mcp-server"
+path = "src/main.rs"
+
+[dependencies]
+# MCP Protocol
+rmcp = { version = "0.8", features = ["server", "macros", "transport-io"] }
+
+# HTTP client for HelixDB
+reqwest = { version = "0.11", features = ["json"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time handling
+chrono = "0.4"
+
+# Configuration
+toml = "0.8"
+
+# UUID for session management
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# MessagePack for TCP embedding client
+rmp-serde = "1.1"
+
+# HelixDB Rust client (assuming it exists, otherwise we'll use HTTP directly)
+# helix-rs = "0.1" # Uncomment if helix-rs crate exists

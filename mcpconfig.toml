@@ -1,0 +1,165 @@
+# MCP Server Configuration for AI Memory Layer
+
+[server]
+name = "AI Memory Layer MCP Server"
+version = "0.1.0"
+
+[helix]
+endpoint = "127.0.0.1"
+port = 6969
+
+# ============================================================================
+# EMBEDDING CONFIGURATION
+# Choose where embeddings are generated: "mcp" or "helixdb"
+# ============================================================================
+
+[embedding]
+# Mode: "mcp" = MCP server generates embeddings (more flexible)
+#       "helixdb" = HelixDB generates embeddings (simpler, uses helix.toml config)
+mode = "mcp"  # Options: "mcp" | "helixdb"
+
+# Provider: Only used when mode = "mcp"
+# Options: "openai" | "gemini" | "local"
+# 
+# QUICK SWITCH BETWEEN LOCAL AND CLOUD:
+# - For cloud (OpenAI, Novita, etc.): provider = "openai"
+# - For local models (Ollama, etc.):  provider = "local"
+# - For Gemini cloud:                 provider = "gemini"
+provider = "local"  # ← CHANGE THIS: "openai" for cloud, "local" for local
+
+# Model: Only used when mode = "mcp" (except for "local")
+# OpenAI/Compatible APIs: "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"
+# Novita AI: "baai/bge-m3", "BAAI/bge-large-en-v1.5"
+# Together AI: "togethercomputer/m2-bert-80M-8k-retrieval"
+# Gemini: "text-embedding-004", "embedding-001"
+# Local: Not used (local server handles model selection)
+model = "text-embedding-3-small"
+
+# API Endpoints: Only used when mode = "mcp"
+# OpenAI Official
+openai_api_url = "https://api.openai.com/v1/embeddings"
+
+# Or use Novita AI (OpenAI-compatible)
+# openai_api_url = "https://api.novita.ai/openai/v1/embeddings"
+
+# Or use Together AI (OpenAI-compatible)
+# openai_api_url = "https://api.together.xyz/v1/embeddings"
+
+# Or use OpenRouter (OpenAI-compatible)
+# openai_api_url = "https://openrouter.ai/api/v1/embeddings"
+
+# Or use Gemini via OpenAI-compatible proxy
+# openai_api_url = "https://generativelanguage.googleapis.com/v1beta/openai/embeddings"
+
+# Gemini native API (deprecated - use OpenAI-compatible instead)
+gemini_api_url = "https://generativelanguage.googleapis.com/v1beta/models"
+
+# Local embedding server - SIMPLE MODE
+# Sends: {"text": "your text"}
+# Expects: [0.1, 0.2, ...] or {"embedding": [...]} or {"vector": [...]}
+# Examples:
+#   - Ollama: http://localhost:11434/api/embeddings (needs wrapper)
+#   - Custom Flask/FastAPI server: http://localhost:8080/embeddings
+#   - Text Embeddings Inference: http://localhost:8080/embed
+local_api_url = "http://localhost:8080/embeddings"
+
+# API Key: Only used when mode = "mcp" and provider = "openai" or "gemini"
+# Leave empty to use environment variable (OPENAI_API_KEY or GEMINI_API_KEY)
+# NOT required for local provider
+api_key = ""
+
+# Dimensions: Vector dimensions (default: 1536 for OpenAI, 768 for Gemini)
+# Only used when mode = "mcp"
+# Common values: 384, 768, 1024, 1536, 3072
+dimensions = 1536
+
+# ============================================================================
+# NOTES:
+# ============================================================================
+# 
+# MODE: "helixdb" (Recommended - Simpler Setup)
+# ------------------------------------------------
+# - HelixDB handles embedding generation using Embed() function
+# - Configure embedding_model in helix.toml: embedding_model = "text-embedding-ada-002"
+# - Set OPENAI_API_KEY or GEMINI_API_KEY environment variable
+# - MCP server just passes text to HelixDB
+# - All queries use same embedding model (consistent)
+# 
+# Pros:
+#   ✅ Simpler MCP server code
+#   ✅ Centralized configuration in helix.toml
+#   ✅ Automatic embedding on data insertion
+#   ✅ No external dependencies in Rust
+# 
+# Cons:
+#   ❌ Less flexible (one model for all memory types)
+#   ❌ Cannot A/B test different models easily
+#
+# ------------------------------------------------
+#
+# MODE: "mcp" (Advanced - More Control)
+# ------------------------------------------------
+# - MCP server generates embeddings via API calls
+# - Requires API key for OpenAI/Gemini providers (NOT for local)
+# - Can use different models for different memory types
+# - Uses OpenAI-compatible API format
+# 
+# Pros:
+#   ✅ Full control over embedding process
+#   ✅ Works with ANY OpenAI-compatible API
+#   ✅ Can switch providers easily
+#   ✅ Simple local mode (no complex JSON)
+# 
+# Cons:
+#   ❌ More complex code
+#   ❌ Network latency per search
+#   ❌ API costs per query (if using cloud APIs)
+#
+# ------------------------------------------------
+#
+# PROVIDER: "openai" (OpenAI-Compatible APIs)
+# ------------------------------------------------
+# Works with:
+#   ✅ OpenAI Official API
+#   ✅ Novita AI (baai/bge-m3, etc.)
+#   ✅ Together AI
+#   ✅ OpenRouter
+#   ✅ Any OpenAI-compatible service
+#
+# Request: POST to openai_api_url
+#   {"model": "...", "input": "text", "encoding_format": "float"}
+# Response: 
+#   {"data": [{"embedding": [0.1, 0.2, ...]}]}
+#
+# ------------------------------------------------
+#
+# PROVIDER: "gemini" (Now OpenAI-Compatible)
+# ------------------------------------------------
+# Use openai_api_url with Gemini's OpenAI-compatible endpoint
+# Set to: https://generativelanguage.googleapis.com/v1beta/openai/embeddings
+# Uses same format as OpenAI provider
+#
+# ------------------------------------------------
+#
+# PROVIDER: "local" (Simple Local Embedding)
+# ------------------------------------------------
+# Perfect for: Ollama, local models, custom servers
+# 
+# Request: POST to local_api_url
+#   {"text": "your text to embed"}
+# 
+# Response (any of these formats work):
+#   [0.1, 0.2, 0.3, ...]                    ← Direct array (simplest)
+#   {"embedding": [0.1, 0.2, ...]}          ← Wrapped
+#   {"vector": [0.1, 0.2, ...]}             ← Alternative
+#
+# Example local server (Python Flask):
+#   @app.route('/embeddings', methods=['POST'])
+#   def embed():
+#       text = request.json['text']
+#       vector = model.encode(text).tolist()
+#       return jsonify(vector)  # Direct array
+#
+# No API key needed!
+#
+# ============================================================================

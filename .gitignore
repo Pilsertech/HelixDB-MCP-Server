@@ -1,0 +1,34 @@
+# Ignore everything by default
+*
+
+# Allow specific files and directories
+!.gitignore
+!README.md
+!Cargo.toml
+!Cargo.lock
+!mcpconfig.toml
+!mcpconfig.example.toml
+!claude_desktop_config.example.json
+!codebase-index-8cb07e38692f31beb4c50994be9e55d039d200bb.zip
+
+# Allow src directory and its contents
+!src/
+!src/**
+
+# Allow db directory and its contents
+!db/
+!db/**
+
+# Ignore Rust build artifacts
+target/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
