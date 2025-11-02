@@ -1,4 +1,4 @@
-use anyhow::Result;
+﻿use anyhow::Result;
 use rmcp::{tool_router, tool, tool_handler, ServerHandler, serve_server, schemars, transport::stdio};
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -64,17 +64,33 @@ struct UpdateBusinessMemoryParam {
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 struct UpdateCustomerMemoryParam {
     memory_id: String,  // behavior_id, preference_id, desire_id, etc.
-    memory_type: String,  // "behavior", "preference", "desire", "rule", "feedback"
+    memory_type: String,  // "behavior", "preference", "desire", "rule", "feedback", "communication"
     updates: serde_json::Value,  // JSON object with fields to update
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct UpdateInteractionParam {
+    interaction_id: String,
+    interaction_type: String,  // "product" or "service"
+    composite_text: String,  // Updated text description for re-embedding
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct UpdateNavigationParam {
+    memory_id: String,  // navigation_id, waypoint_id, or path_id
+    navigation_type: String,  // "hub", "waypoint", or "path"
+    composite_text: String,  // Updated text description for re-embedding
 }
 
 // Delete parameters
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 struct DeleteMemoryParam {
     memory_id: String,
-    memory_type: String,  // "product", "service", "behavior", "preference", etc.
+    memory_type: String,  // "product", "service", "behavior", "preference", "business", "customer", etc.
     #[serde(skip_serializing_if = "Option::is_none")]
     delete_embedding: Option<bool>,  // Whether to also delete embedding (default: true)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delete_strategy: Option<String>,  // "node_only", "with_embedding", "cascade", "complete" (default: "with_embedding")
 }
 
 // Advanced: Direct query execution
@@ -98,6 +114,18 @@ struct SearchSemanticParam {
 }
 
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct SearchBM25Param {
+    query: String,  // Keyword search query
+    memory_types: Vec<String>,  // e.g., ["products", "services", "preferences"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    business_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    customer_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<i32>,  // Default: 10
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
 struct FindCustomerInsightsParam {
     #[serde(skip_serializing_if = "Option::is_none")]
     customer_id: Option<String>,
@@ -106,6 +134,232 @@ struct FindCustomerInsightsParam {
     #[serde(skip_serializing_if = "Option::is_none")]
     service_id: Option<String>,
     relationship_type: String,  // "liked", "disliked", "used_service", "visited_location", "all"
+}
+
+// Customer Interaction parameters
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct CreateCustomerProductInteractionParam {
+    customer_id: String,
+    product_id: String,
+    interaction_id: String,
+    interaction_type: String,  // "liked", "disliked", "purchased", "viewed", "favorited", "reviewed"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rating: Option<i32>,  // Rating if applicable (1-5 scale)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    channel: Option<String>,  // "whatsapp", "website", "store", etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_duration: Option<i32>,  // How long customer engaged (seconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    purchase_amount: Option<f64>,  // Amount spent if purchased
+    #[serde(skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,  // Currency of purchase
+    #[serde(skip_serializing_if = "Option::is_none")]
+    issue_category: Option<String>,  // For dislikes: "quality", "price", "functionality", "service"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolution_status: Option<String>,  // For issues: "resolved", "pending", "escalated"
+    text_reason: String,  // Natural language reason for interaction (used for embedding)
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct CreateCustomerServiceInteractionParam {
+    customer_id: String,
+    service_id: String,
+    interaction_id: String,
+    interaction_type: String,  // "booked", "completed", "reviewed", "canceled"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    satisfaction_rating: Option<i32>,  // Rating (1-5 scale)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_actual: Option<i32>,  // Actual duration in minutes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cost_actual: Option<f64>,  // Actual cost paid
+    #[serde(skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,  // Currency code
+    #[serde(skip_serializing_if = "Option::is_none")]
+    outcome: Option<String>,  // Service outcome
+    text_feedback: String,  // Natural language feedback (used for embedding)
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct QueryCustomerInteractionsParam {
+    customer_id: String,
+    interaction_type: String,  // "product", "service", "all"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filters: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct SearchCustomerInteractionsParam {
+    query: String,
+    interaction_types: Vec<String>,  // e.g., ["product", "service"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    customer_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<i32>,
+}
+
+// Navigation System parameters
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct CreateNavigationHubParam {
+    business_id: String,
+    navigation_id: String,
+    primary_address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    secondary_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    building_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    building_type: Option<String>,
+    latitude: f64,
+    longitude: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    what3words_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plus_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compass_bearing: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compass_reference: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    magnetic_declination: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    building_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    building_floors: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    business_floor: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    building_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    building_size: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    main_entrance_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alternative_entrances: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entrance_restrictions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    wheelchair_accessible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    elevator_available: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stairs_required: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    accessibility_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parking_available: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parking_description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    public_transport_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    direction_varies_by_hours: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    after_hours_instructions: Option<String>,
+    navigation_summary: String,  // Used for embedding
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct CreateNavigationWaypointParam {
+    waypoint_id: String,
+    navigation_id: String,
+    waypoint_name: String,
+    waypoint_type: String,  // "landmark", "turn", "intersection", "building", "sign"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    waypoint_category: Option<String>,
+    description: String,  // Used for embedding
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visual_cues: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    audio_cues: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    relative_position: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    distance_from_main: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    floor_level: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compass_direction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compass_bearing: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compass_distance: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    business_specific_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    accessibility_info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seasonal_availability: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_restrictions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    weather_dependent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority_level: Option<i32>,
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct CreateDirectionPathParam {
+    path_id: String,
+    navigation_id: String,
+    path_name: String,
+    path_type: String,  // "primary", "alternative", "accessible", "emergency"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    transport_mode: Option<String>,  // "walking", "driving", "cycling", "public_transport"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    estimated_duration_minutes: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    difficulty_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    distance_meters: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    starting_compass_bearing: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ending_compass_bearing: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path_compass_waypoints: Option<String>,  // JSON array of compass bearings
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suitable_for_mobility_aids: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suitable_for_children: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suitable_in_rain: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suitable_at_night: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires_appointment: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires_security_clearance: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visitor_badge_required: Option<bool>,
+    step_by_step_instructions: String,  // Used for embedding
+    #[serde(skip_serializing_if = "Option::is_none")]
+    quick_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_recommended: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct QueryNavigationParam {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    business_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    navigation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_waypoints: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_paths: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filter_accessible_only: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct SearchNavigationParam {
+    query: String,
+    search_types: Vec<String>,  // e.g., ["hubs", "waypoints", "paths"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    business_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<i32>,
 }
 
 #[derive(Clone)]
@@ -390,8 +644,27 @@ impl HelixMcpServer {
             // Search across requested memory types
             for memory_type in memory_types {
                 let query_name = match memory_type.as_str() {
+                    // Business memory types
                     "products" => "search_business_products_semantic",
+                    "services" => "search_business_services_semantic",
+                    "locations" => "search_business_locations_semantic",
+                    "hours" => "search_business_hours_semantic",
+                    "social" => "search_business_social_semantic",
+                    "policies" => "search_business_policies_semantic",
+                    "events" => "search_business_events_semantic",
+                    // Customer memory types
+                    "behaviors" => "search_customer_behaviors_semantic",
                     "preferences" => "search_customer_preferences_semantic",
+                    "desires" => "search_customer_desires_semantic",
+                    "rules" => "search_customer_rules_semantic",
+                    "feedback" => "search_customer_feedback_semantic",
+                    // Customer interaction types
+                    "product_interactions" => "search_customer_product_interactions_semantic",
+                    "service_interactions" => "search_customer_service_interactions_semantic",
+                    // Navigation types
+                    "navigation_hubs" => "search_navigation_hubs_semantic",
+                    "waypoints" => "search_navigation_waypoints_semantic",
+                    "direction_paths" => "search_direction_paths_semantic",
                     _ => {
                         info!("Skipping unsupported memory type for semantic search: {}", memory_type);
                         continue;
@@ -493,8 +766,27 @@ impl HelixMcpServer {
             // Search across requested memory types using generated embedding
             for memory_type in memory_types {
                 let query_name = match memory_type.as_str() {
+                    // Business memory types
                     "products" => "search_business_products_hybrid",
+                    "services" => "search_business_services_hybrid",
+                    "locations" => "search_business_locations_hybrid",
+                    "hours" => "search_business_hours_hybrid",
+                    "social" => "search_business_social_hybrid",
+                    "policies" => "search_business_policies_hybrid",
+                    "events" => "search_business_events_hybrid",
+                    // Customer memory types
+                    "behaviors" => "search_customer_behaviors_hybrid",
                     "preferences" => "search_customer_preferences_hybrid",
+                    "desires" => "search_customer_desires_hybrid",
+                    "rules" => "search_customer_rules_hybrid",
+                    "feedback" => "search_customer_feedback_hybrid",
+                    // Customer interaction types
+                    "product_interactions" => "search_customer_product_interactions_hybrid",
+                    "service_interactions" => "search_customer_service_interactions_hybrid",
+                    // Navigation types
+                    "navigation_hubs" => "search_navigation_hubs_hybrid",
+                    "waypoints" => "search_navigation_waypoints_hybrid",
+                    "direction_paths" => "search_direction_paths_hybrid",
                     _ => {
                         info!("Skipping unsupported memory type for semantic search: {}", memory_type);
                         continue;
@@ -509,16 +801,28 @@ impl HelixMcpServer {
 
                 // Add filters based on optional parameters
                 if let Some(business_id) = &params.0.business_id {
-                    if memory_type == "products" {
-                        payload["business_id"] = json!(business_id);
-                        payload["min_price"] = json!(0.0);
-                        payload["max_price"] = json!(1000000.0);
+                    // Apply business_id filter to business memory types
+                    match memory_type.as_str() {
+                        "products" => {
+                            payload["business_id"] = json!(business_id);
+                            payload["min_price"] = json!(0.0);
+                            payload["max_price"] = json!(1000000.0);
+                        }
+                        "services" | "locations" | "hours" | "social" | "policies" | "events" => {
+                            payload["business_id"] = json!(business_id);
+                        }
+                        _ => {}
                     }
                 }
 
                 if let Some(customer_id) = &params.0.customer_id {
-                    if memory_type == "preferences" {
-                        payload["customer_id"] = json!(customer_id);
+                    // Apply customer_id filter to customer memory types
+                    match memory_type.as_str() {
+                        "behaviors" | "preferences" | "desires" | "rules" | "feedback" 
+                        | "product_interactions" | "service_interactions" => {
+                            payload["customer_id"] = json!(customer_id);
+                        }
+                        _ => {}
                     }
                 }
 
@@ -550,6 +854,83 @@ impl HelixMcpServer {
         // Fallback (should never reach here)
         Ok(CallToolResult::structured_error(json!({
             "error": "Invalid embedding configuration. Check mcpconfig.toml"
+        })))
+    }
+
+    #[tool(description = "BM25 keyword search - fast text-based search across all memory types. Use for exact matches, IDs, phone numbers, or when embeddings unavailable. Always available as fallback.")]
+    async fn search_bm25(&self, params: Parameters<SearchBM25Param>) -> Result<CallToolResult, McpError> {
+        let query = &params.0.query;
+        let memory_types = &params.0.memory_types;
+        let limit = params.0.limit.unwrap_or(10);
+
+        info!("search_bm25: query='{}', types={:?}, limit={}", query, memory_types, limit);
+
+        let mut all_results = Vec::new();
+
+        // Route each memory type to its BM25 query
+        for memory_type in memory_types {
+            let query_name = match memory_type.as_str() {
+                "products" => "search_business_products_bm25",
+                "services" => "search_business_services_bm25",
+                "locations" => "search_business_locations_bm25",
+                "hours" => "search_business_hours_bm25",
+                "social" => "search_business_social_bm25",
+                "policies" => "search_business_policies_bm25",
+                "events" => "search_business_events_bm25",
+                "behaviors" => "search_customer_behaviors_bm25",
+                "preferences" => "search_customer_preferences_bm25",
+                "desires" => "search_customer_desires_bm25",
+                "rules" => "search_customer_rules_bm25",
+                "feedback" => "search_customer_feedback_bm25",
+                "communication" => "search_customer_communication_bm25",
+                "product_interactions" => "search_customer_product_interactions_bm25",
+                "service_interactions" => "search_customer_service_interactions_bm25",
+                "navigation_hubs" => "search_navigation_hubs_bm25",
+                "waypoints" => "search_waypoints_bm25",
+                "direction_paths" => "search_direction_paths_bm25",
+                _ => {
+                    warn!("Unknown memory type for BM25 search: {}", memory_type);
+                    continue;
+                }
+            };
+
+            // Build payload with query_text and k (limit)
+            let mut payload = json!({
+                "query_text": query,
+                "k": limit
+            });
+
+            // Add filters if provided
+            if let Some(business_id) = &params.0.business_id {
+                // Note: BM25 queries don't use filters, but we can log it for context
+                info!("BM25 search context: business_id={}", business_id);
+            }
+
+            if let Some(customer_id) = &params.0.customer_id {
+                info!("BM25 search context: customer_id={}", customer_id);
+            }
+
+            // Execute BM25 query
+            match self.helix_client.query(query_name, payload).await {
+                Ok(results) => {
+                    if let Some(array) = results.as_array() {
+                        all_results.extend(array.iter().cloned());
+                    }
+                }
+                Err(e) => {
+                    error!("BM25 search failed for {}: {}", memory_type, e);
+                }
+            }
+        }
+
+        Ok(CallToolResult::structured(json!({
+            "query": query,
+            "memory_types": memory_types,
+            "search_type": "bm25_keyword",
+            "total_results": all_results.len(),
+            "limit": limit,
+            "note": "BM25 uses keyword matching, not semantic embeddings. Best for exact terms, IDs, or specific phrases.",
+            "results": all_results
         })))
     }
 
@@ -851,6 +1232,902 @@ impl HelixMcpServer {
     }
 
     // ========================================================================
+    // CUSTOMER INTERACTION TOOLS - Track detailed customer interactions
+    // ========================================================================
+
+    #[tool(description = "Create customer product interaction - track detailed customer-product interactions with reasons (likes, dislikes, purchases, views, reviews)")]
+    async fn create_customer_product_interaction(&self, params: Parameters<CreateCustomerProductInteractionParam>) -> Result<CallToolResult, McpError> {
+        let customer_id = &params.0.customer_id;
+        let product_id = &params.0.product_id;
+        let interaction_type = &params.0.interaction_type;
+        let text_reason = &params.0.text_reason;
+        
+        info!("create_customer_product_interaction: customer_id={}, product_id={}, type={}", customer_id, product_id, interaction_type);
+
+        // Build the data payload with all fields
+        let timestamp = chrono::Utc::now().timestamp();
+        let mut data = json!({
+            "customer_id": customer_id,
+            "product_id": product_id,
+            "interaction_id": params.0.interaction_id,
+            "interaction_type": interaction_type,
+            "rating": params.0.rating.unwrap_or(0),
+            "timestamp": timestamp,
+            "channel": params.0.channel.as_ref().unwrap_or(&String::from("")),
+            "session_duration": params.0.session_duration.unwrap_or(0),
+            "purchase_amount": params.0.purchase_amount.unwrap_or(0.0),
+            "currency": params.0.currency.as_ref().unwrap_or(&String::from("USD")),
+            "issue_category": params.0.issue_category.as_ref().unwrap_or(&String::from("")),
+            "resolution_status": params.0.resolution_status.as_ref().unwrap_or(&String::from("none")),
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "text_reason": text_reason
+        });
+
+        // Check if embedding needs to be generated (MCP mode)
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Generating embedding for text_reason...");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(text_reason, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    
+                    data["embedding"] = json!(embedding);
+                    
+                    let model_name = match self.config.embedding.provider {
+                        Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
+                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
+                        }
+                        Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
+                        None => "unknown".to_string()
+                    };
+                    data["embedding_model"] = json!(model_name);
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e),
+                        "suggestion": "Check embedding configuration and API connectivity"
+                    })));
+                }
+            }
+        } else {
+            info!("Using HelixDB embedding mode - HelixDB will generate embedding");
+        }
+
+        // Execute the query
+        match self.helix_client.query("add_customer_product_interaction", data).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "interaction_type": "product",
+                    "customer_id": customer_id,
+                    "product_id": product_id,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("create_customer_product_interaction failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to create product interaction: {}", e)
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Create customer service interaction - track detailed customer-service interactions with feedback (bookings, completions, reviews, cancellations)")]
+    async fn create_customer_service_interaction(&self, params: Parameters<CreateCustomerServiceInteractionParam>) -> Result<CallToolResult, McpError> {
+        let customer_id = &params.0.customer_id;
+        let service_id = &params.0.service_id;
+        let interaction_type = &params.0.interaction_type;
+        let text_feedback = &params.0.text_feedback;
+        
+        info!("create_customer_service_interaction: customer_id={}, service_id={}, type={}", customer_id, service_id, interaction_type);
+
+        // Build the data payload with all fields
+        let timestamp = chrono::Utc::now().timestamp();
+        let mut data = json!({
+            "customer_id": customer_id,
+            "service_id": service_id,
+            "interaction_id": params.0.interaction_id,
+            "interaction_type": interaction_type,
+            "satisfaction_rating": params.0.satisfaction_rating.unwrap_or(3),
+            "timestamp": timestamp,
+            "duration_actual": params.0.duration_actual.unwrap_or(0),
+            "cost_actual": params.0.cost_actual.unwrap_or(0.0),
+            "currency": params.0.currency.as_ref().unwrap_or(&String::from("USD")),
+            "outcome": params.0.outcome.as_ref().unwrap_or(&String::from("")),
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "text_feedback": text_feedback
+        });
+
+        // Check if embedding needs to be generated (MCP mode)
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Generating embedding for text_feedback...");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(text_feedback, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    
+                    data["embedding"] = json!(embedding);
+                    
+                    let model_name = match self.config.embedding.provider {
+                        Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
+                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
+                        }
+                        Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
+                        None => "unknown".to_string()
+                    };
+                    data["embedding_model"] = json!(model_name);
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e),
+                        "suggestion": "Check embedding configuration and API connectivity"
+                    })));
+                }
+            }
+        } else {
+            info!("Using HelixDB embedding mode - HelixDB will generate embedding");
+        }
+
+        // Execute the query
+        match self.helix_client.query("add_customer_service_interaction", data).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "interaction_type": "service",
+                    "customer_id": customer_id,
+                    "service_id": service_id,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("create_customer_service_interaction failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to create service interaction: {}", e)
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Query customer interactions - get all product and/or service interactions for a customer")]
+    async fn query_customer_interactions(&self, params: Parameters<QueryCustomerInteractionsParam>) -> Result<CallToolResult, McpError> {
+        let customer_id = &params.0.customer_id;
+        let interaction_type = &params.0.interaction_type;
+        
+        info!("query_customer_interactions: customer_id={}, type={}", customer_id, interaction_type);
+
+        let mut all_interactions = json!({});
+
+        match interaction_type.as_str() {
+            "product" => {
+                // Get product interactions only
+                match self.helix_client.query(
+                    "get_customer_product_interactions",
+                    json!({"customer_id": customer_id})
+                ).await {
+                    Ok(interactions) => {
+                        all_interactions["product_interactions"] = interactions;
+                    }
+                    Err(e) => {
+                        error!("Failed to get product interactions: {}", e);
+                        return Ok(CallToolResult::structured_error(json!({
+                            "error": format!("Failed to get product interactions: {}", e)
+                        })));
+                    }
+                }
+            }
+            "service" => {
+                // Get service interactions only
+                match self.helix_client.query(
+                    "get_customer_service_interactions",
+                    json!({"customer_id": customer_id})
+                ).await {
+                    Ok(interactions) => {
+                        all_interactions["service_interactions"] = interactions;
+                    }
+                    Err(e) => {
+                        error!("Failed to get service interactions: {}", e);
+                        return Ok(CallToolResult::structured_error(json!({
+                            "error": format!("Failed to get service interactions: {}", e)
+                        })));
+                    }
+                }
+            }
+            "all" => {
+                // Get both product and service interactions
+                if let Ok(product_interactions) = self.helix_client.query(
+                    "get_customer_product_interactions",
+                    json!({"customer_id": customer_id})
+                ).await {
+                    all_interactions["product_interactions"] = product_interactions;
+                }
+                
+                if let Ok(service_interactions) = self.helix_client.query(
+                    "get_customer_service_interactions",
+                    json!({"customer_id": customer_id})
+                ).await {
+                    all_interactions["service_interactions"] = service_interactions;
+                }
+            }
+            _ => {
+                return Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Invalid interaction_type: {}. Valid types: product, service, all", interaction_type)
+                })));
+            }
+        }
+
+        // Apply filters if provided
+        if let Some(filters) = &params.0.filters {
+            all_interactions = self.apply_filters(all_interactions, filters);
+        }
+
+        // Count results
+        let product_count = all_interactions.get("product_interactions")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+        let service_count = all_interactions.get("service_interactions")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+
+        Ok(CallToolResult::structured(json!({
+            "customer_id": customer_id,
+            "interaction_type": interaction_type,
+            "product_count": product_count,
+            "service_count": service_count,
+            "total_count": product_count + service_count,
+            "data": all_interactions
+        })))
+    }
+
+    #[tool(description = "Search customer interactions semantically - find product and service interactions by meaning using AI embeddings")]
+    async fn search_customer_interactions(&self, params: Parameters<SearchCustomerInteractionsParam>) -> Result<CallToolResult, McpError> {
+        let query = &params.0.query;
+        let interaction_types = &params.0.interaction_types;
+        let limit = params.0.limit.unwrap_or(10);
+        
+        info!("search_customer_interactions: query='{}', types={:?}, limit={}", query, interaction_types, limit);
+
+        // Check embedding mode
+        if self.config.is_helixdb_embedding_enabled() {
+            info!("Using HelixDB embedding mode (Embed() function in queries)");
+            
+            let mut all_results = Vec::new();
+            
+            // Search across requested interaction types
+            for interaction_type in interaction_types {
+                let query_name = match interaction_type.as_str() {
+                    "product" => "search_customer_product_interactions",
+                    "service" => "search_customer_service_interactions",
+                    _ => {
+                        info!("Skipping unsupported interaction type: {}", interaction_type);
+                        continue;
+                    }
+                };
+
+                let mut payload = json!({
+                    "query_embedding": query,
+                    "limit": limit,
+                });
+
+                if let Some(customer_id) = &params.0.customer_id {
+                    payload["customer_id"] = json!(customer_id);
+                }
+
+                match self.helix_client.query(query_name, payload).await {
+                    Ok(results) => {
+                        if let Some(array) = results.as_array() {
+                            all_results.extend(array.iter().cloned());
+                        }
+                    }
+                    Err(e) => {
+                        error!("Interaction search failed for {}: {}", interaction_type, e);
+                    }
+                }
+            }
+
+            return Ok(CallToolResult::structured(json!({
+                "query": query,
+                "interaction_types": interaction_types,
+                "total_results": all_results.len(),
+                "limit": limit,
+                "embedding_mode": "helixdb",
+                "results": all_results
+            })));
+        }
+
+        // MCP mode: Generate embedding
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Using MCP embedding mode");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            let query_embedding = match self.generate_embedding(query, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated embedding vector with {} dimensions", embedding.len());
+                    embedding
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Embedding generation failed: {}", e),
+                        "suggestion": "Check API key, network connection, and server status"
+                    })));
+                }
+            };
+
+            let mut all_results = Vec::new();
+            
+            for interaction_type in interaction_types {
+                let query_name = match interaction_type.as_str() {
+                    "product" => "search_customer_product_interactions",
+                    "service" => "search_customer_service_interactions",
+                    _ => {
+                        info!("Skipping unsupported interaction type: {}", interaction_type);
+                        continue;
+                    }
+                };
+
+                let mut payload = json!({
+                    "query_embedding": query_embedding,
+                    "limit": limit,
+                });
+
+                if let Some(customer_id) = &params.0.customer_id {
+                    payload["customer_id"] = json!(customer_id);
+                }
+
+                match self.helix_client.query(query_name, payload).await {
+                    Ok(results) => {
+                        if let Some(array) = results.as_array() {
+                            all_results.extend(array.iter().cloned());
+                        }
+                    }
+                    Err(e) => {
+                        error!("Interaction search failed for {}: {}", interaction_type, e);
+                    }
+                }
+            }
+
+            return Ok(CallToolResult::structured(json!({
+                "query": query,
+                "interaction_types": interaction_types,
+                "total_results": all_results.len(),
+                "limit": limit,
+                "embedding_mode": "mcp",
+                "results": all_results
+            })));
+        }
+
+        Ok(CallToolResult::structured_error(json!({
+            "error": "Invalid embedding configuration. Check mcpconfig.toml"
+        })))
+    }
+
+    // ========================================================================
+    // NAVIGATION SYSTEM TOOLS - Physical location navigation with compass data
+    // ========================================================================
+
+    #[tool(description = "Create navigation hub - set up comprehensive navigation center for a business with address, coordinates, compass bearings, and accessibility information")]
+    async fn create_navigation_hub(&self, params: Parameters<CreateNavigationHubParam>) -> Result<CallToolResult, McpError> {
+        let business_id = &params.0.business_id;
+        let navigation_id = &params.0.navigation_id;
+        let navigation_summary = &params.0.navigation_summary;
+        
+        info!("create_navigation_hub: business_id={}, navigation_id={}", business_id, navigation_id);
+
+        // Build the data payload with all fields
+        let timestamp = chrono::Utc::now().timestamp();
+        let mut data = json!({
+            "business_id": business_id,
+            "navigation_id": navigation_id,
+            "primary_address": params.0.primary_address,
+            "secondary_address": params.0.secondary_address.as_ref().unwrap_or(&String::from("")),
+            "building_name": params.0.building_name.as_ref().unwrap_or(&String::from("")),
+            "building_type": params.0.building_type.as_ref().unwrap_or(&String::from("")),
+            "latitude": params.0.latitude,
+            "longitude": params.0.longitude,
+            "what3words_code": params.0.what3words_code.as_ref().unwrap_or(&String::from("")),
+            "plus_code": params.0.plus_code.as_ref().unwrap_or(&String::from("")),
+            "compass_bearing": params.0.compass_bearing.unwrap_or(0.0),
+            "compass_reference": params.0.compass_reference.as_ref().unwrap_or(&String::from("")),
+            "magnetic_declination": params.0.magnetic_declination.unwrap_or(0.0),
+            "building_description": params.0.building_description.as_ref().unwrap_or(&String::from("")),
+            "building_floors": params.0.building_floors.unwrap_or(1),
+            "business_floor": params.0.business_floor.unwrap_or(1),
+            "building_color": params.0.building_color.as_ref().unwrap_or(&String::from("")),
+            "building_size": params.0.building_size.as_ref().unwrap_or(&String::from("")),
+            "main_entrance_description": params.0.main_entrance_description.as_ref().unwrap_or(&String::from("")),
+            "alternative_entrances": params.0.alternative_entrances.as_ref().unwrap_or(&String::from("")),
+            "entrance_restrictions": params.0.entrance_restrictions.as_ref().unwrap_or(&String::from("")),
+            "wheelchair_accessible": params.0.wheelchair_accessible.unwrap_or(false),
+            "elevator_available": params.0.elevator_available.unwrap_or(false),
+            "stairs_required": params.0.stairs_required.unwrap_or(false),
+            "accessibility_notes": params.0.accessibility_notes.as_ref().unwrap_or(&String::from("")),
+            "parking_available": params.0.parking_available.unwrap_or(false),
+            "parking_description": params.0.parking_description.as_ref().unwrap_or(&String::from("")),
+            "public_transport_notes": params.0.public_transport_notes.as_ref().unwrap_or(&String::from("")),
+            "direction_varies_by_hours": params.0.direction_varies_by_hours.unwrap_or(false),
+            "after_hours_instructions": params.0.after_hours_instructions.as_ref().unwrap_or(&String::from("")),
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "last_verified_at": timestamp,
+            "verification_source": "user",
+            "navigation_summary": navigation_summary
+        });
+
+        // Check if embedding needs to be generated (MCP mode)
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Generating embedding for navigation_summary...");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(navigation_summary, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    
+                    data["embedding"] = json!(embedding);
+                    
+                    let model_name = match self.config.embedding.provider {
+                        Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
+                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
+                        }
+                        Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
+                        None => "unknown".to_string()
+                    };
+                    data["embedding_model"] = json!(model_name);
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e),
+                        "suggestion": "Check embedding configuration and API connectivity"
+                    })));
+                }
+            }
+        } else {
+            info!("Using HelixDB embedding mode - HelixDB will generate embedding");
+        }
+
+        // Execute the query
+        match self.helix_client.query("add_business_navigation_hub", data).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "business_id": business_id,
+                    "navigation_id": navigation_id,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("create_navigation_hub failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to create navigation hub: {}", e)
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Create navigation waypoint - add landmarks, reference points, and visual cues with compass bearings for navigation")]
+    async fn create_navigation_waypoint(&self, params: Parameters<CreateNavigationWaypointParam>) -> Result<CallToolResult, McpError> {
+        let waypoint_id = &params.0.waypoint_id;
+        let navigation_id = &params.0.navigation_id;
+        let description = &params.0.description;
+        
+        info!("create_navigation_waypoint: waypoint_id={}, navigation_id={}", waypoint_id, navigation_id);
+
+        // Build the data payload
+        let timestamp = chrono::Utc::now().timestamp();
+        let mut data = json!({
+            "waypoint_id": waypoint_id,
+            "navigation_id": navigation_id,
+            "waypoint_name": params.0.waypoint_name,
+            "waypoint_type": params.0.waypoint_type,
+            "waypoint_category": params.0.waypoint_category.as_ref().unwrap_or(&String::from("")),
+            "description": description,
+            "visual_cues": params.0.visual_cues.as_ref().unwrap_or(&String::from("")),
+            "audio_cues": params.0.audio_cues.as_ref().unwrap_or(&String::from("")),
+            "relative_position": params.0.relative_position.as_ref().unwrap_or(&String::from("")),
+            "distance_from_main": params.0.distance_from_main.unwrap_or(0),
+            "floor_level": params.0.floor_level.unwrap_or(0),
+            "compass_direction": params.0.compass_direction.as_ref().unwrap_or(&String::from("")),
+            "compass_bearing": params.0.compass_bearing.unwrap_or(0.0),
+            "compass_distance": params.0.compass_distance.unwrap_or(0.0),
+            "business_specific_notes": params.0.business_specific_notes.as_ref().unwrap_or(&String::from("")),
+            "accessibility_info": params.0.accessibility_info.as_ref().unwrap_or(&String::from("")),
+            "seasonal_availability": params.0.seasonal_availability.as_ref().unwrap_or(&String::from("")),
+            "time_restrictions": params.0.time_restrictions.as_ref().unwrap_or(&String::from("")),
+            "weather_dependent": params.0.weather_dependent.unwrap_or(false),
+            "created_at": timestamp,
+            "is_active": true,
+            "priority_level": params.0.priority_level.unwrap_or(1)
+        });
+
+        // Check if embedding needs to be generated (MCP mode)
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Generating embedding for waypoint description...");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(description, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    
+                    data["embedding"] = json!(embedding);
+                    
+                    let model_name = match self.config.embedding.provider {
+                        Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
+                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
+                        }
+                        Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
+                        None => "unknown".to_string()
+                    };
+                    data["embedding_model"] = json!(model_name);
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e),
+                        "suggestion": "Check embedding configuration and API connectivity"
+                    })));
+                }
+            }
+        } else {
+            info!("Using HelixDB embedding mode - HelixDB will generate embedding");
+        }
+
+        // Execute the query
+        match self.helix_client.query("add_navigation_waypoint", data).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "waypoint_id": waypoint_id,
+                    "navigation_id": navigation_id,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("create_navigation_waypoint failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to create navigation waypoint: {}", e)
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Create direction path - add step-by-step directions with compass waypoints, suitability flags, and accessibility information")]
+    async fn create_direction_path(&self, params: Parameters<CreateDirectionPathParam>) -> Result<CallToolResult, McpError> {
+        let path_id = &params.0.path_id;
+        let navigation_id = &params.0.navigation_id;
+        let step_by_step_instructions = &params.0.step_by_step_instructions;
+        
+        info!("create_direction_path: path_id={}, navigation_id={}", path_id, navigation_id);
+
+        // Build the data payload
+        let timestamp = chrono::Utc::now().timestamp();
+        let mut data = json!({
+            "path_id": path_id,
+            "navigation_id": navigation_id,
+            "path_name": params.0.path_name,
+            "path_type": params.0.path_type,
+            "transport_mode": params.0.transport_mode.as_ref().unwrap_or(&String::from("walking")),
+            "estimated_duration_minutes": params.0.estimated_duration_minutes.unwrap_or(10),
+            "difficulty_level": params.0.difficulty_level.as_ref().unwrap_or(&String::from("easy")),
+            "distance_meters": params.0.distance_meters.unwrap_or(0),
+            "starting_compass_bearing": params.0.starting_compass_bearing.unwrap_or(0.0),
+            "ending_compass_bearing": params.0.ending_compass_bearing.unwrap_or(0.0),
+            "path_compass_waypoints": params.0.path_compass_waypoints.as_ref().unwrap_or(&String::from("[]")),
+            "suitable_for_mobility_aids": params.0.suitable_for_mobility_aids.unwrap_or(false),
+            "suitable_for_children": params.0.suitable_for_children.unwrap_or(true),
+            "suitable_in_rain": params.0.suitable_in_rain.unwrap_or(true),
+            "suitable_at_night": params.0.suitable_at_night.unwrap_or(true),
+            "requires_appointment": params.0.requires_appointment.unwrap_or(false),
+            "requires_security_clearance": params.0.requires_security_clearance.unwrap_or(false),
+            "visitor_badge_required": params.0.visitor_badge_required.unwrap_or(false),
+            "step_by_step_instructions": step_by_step_instructions,
+            "quick_summary": params.0.quick_summary.as_ref().unwrap_or(&String::from("")),
+            "created_at": timestamp,
+            "is_recommended": params.0.is_recommended.unwrap_or(false),
+            "is_active": true,
+            "last_used_feedback": ""
+        });
+
+        // Check if embedding needs to be generated (MCP mode)
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Generating embedding for step-by-step instructions...");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(step_by_step_instructions, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated {} dimensional embedding", embedding.len());
+                    
+                    data["embedding"] = json!(embedding);
+                    
+                    let model_name = match self.config.embedding.provider {
+                        Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
+                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
+                        }
+                        Some(config::EmbeddingProvider::Local) => "local".to_string(),
+                        Some(config::EmbeddingProvider::Tcp) => "tcp-local".to_string(),
+                        None => "unknown".to_string()
+                    };
+                    data["embedding_model"] = json!(model_name);
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e),
+                        "suggestion": "Check embedding configuration and API connectivity"
+                    })));
+                }
+            }
+        } else {
+            info!("Using HelixDB embedding mode - HelixDB will generate embedding");
+        }
+
+        // Execute the query
+        match self.helix_client.query("add_direction_path", data).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "path_id": path_id,
+                    "navigation_id": navigation_id,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("create_direction_path failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to create direction path: {}", e)
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Query navigation - get complete navigation data for a business including hub, waypoints, and paths with optional filtering")]
+    async fn query_navigation(&self, params: Parameters<QueryNavigationParam>) -> Result<CallToolResult, McpError> {
+        info!("query_navigation");
+
+        let mut navigation_data = json!({});
+
+        // Determine navigation_id from business_id or use provided navigation_id
+        let nav_id = if let Some(business_id) = &params.0.business_id {
+            // Get navigation hub for business
+            match self.helix_client.query(
+                "get_business_navigation_hub",
+                json!({"business_id": business_id})
+            ).await {
+                Ok(hub) => {
+                    navigation_data["hub"] = hub.clone();
+                    // Extract navigation_id from hub
+                    hub.get("navigation_id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                }
+                Err(e) => {
+                    error!("Failed to get navigation hub: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get navigation hub: {}", e)
+                    })));
+                }
+            }
+        } else if let Some(navigation_id) = &params.0.navigation_id {
+            navigation_data["hub"] = json!({"navigation_id": navigation_id});
+            Some(navigation_id.clone())
+        } else {
+            return Ok(CallToolResult::structured_error(json!({
+                "error": "Must provide either business_id or navigation_id"
+            })));
+        };
+
+        let nav_id = match nav_id {
+            Some(id) => id,
+            None => {
+                return Ok(CallToolResult::structured_error(json!({
+                    "error": "Could not determine navigation_id"
+                })));
+            }
+        };
+
+        // Get waypoints if requested
+        if params.0.include_waypoints.unwrap_or(true) {
+            match self.helix_client.query(
+                "get_navigation_waypoints",
+                json!({"navigation_id": nav_id})
+            ).await {
+                Ok(waypoints) => {
+                    navigation_data["waypoints"] = waypoints;
+                }
+                Err(e) => {
+                    error!("Failed to get waypoints: {}", e);
+                }
+            }
+        }
+
+        // Get paths if requested
+        if params.0.include_paths.unwrap_or(true) {
+            let query_name = if params.0.filter_accessible_only.unwrap_or(false) {
+                "get_accessible_navigation"
+            } else {
+                "get_direction_paths"
+            };
+
+            match self.helix_client.query(
+                query_name,
+                json!({"navigation_id": nav_id})
+            ).await {
+                Ok(paths) => {
+                    navigation_data["paths"] = paths;
+                }
+                Err(e) => {
+                    error!("Failed to get paths: {}", e);
+                }
+            }
+        }
+
+        // Count results
+        let waypoint_count = navigation_data.get("waypoints")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+        let path_count = navigation_data.get("paths")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+
+        Ok(CallToolResult::structured(json!({
+            "navigation_id": nav_id,
+            "waypoint_count": waypoint_count,
+            "path_count": path_count,
+            "data": navigation_data
+        })))
+    }
+
+    #[tool(description = "Search navigation semantically - find navigation hubs, waypoints, and paths by meaning using AI embeddings")]
+    async fn search_navigation(&self, params: Parameters<SearchNavigationParam>) -> Result<CallToolResult, McpError> {
+        let query = &params.0.query;
+        let search_types = &params.0.search_types;
+        let limit = params.0.limit.unwrap_or(10);
+        
+        info!("search_navigation: query='{}', types={:?}, limit={}", query, search_types, limit);
+
+        // Check embedding mode
+        if self.config.is_helixdb_embedding_enabled() {
+            info!("Using HelixDB embedding mode");
+            
+            let mut all_results = Vec::new();
+            
+            for search_type in search_types {
+                let query_name = match search_type.as_str() {
+                    "hubs" => "search_navigation_hubs",
+                    "waypoints" => "search_navigation_waypoints",
+                    "paths" => "search_direction_paths",
+                    _ => {
+                        info!("Skipping unsupported search type: {}", search_type);
+                        continue;
+                    }
+                };
+
+                let mut payload = json!({
+                    "query_embedding": query,
+                    "limit": limit,
+                });
+
+                if let Some(business_id) = &params.0.business_id {
+                    payload["business_id"] = json!(business_id);
+                }
+
+                match self.helix_client.query(query_name, payload).await {
+                    Ok(results) => {
+                        if let Some(array) = results.as_array() {
+                            all_results.extend(array.iter().cloned());
+                        }
+                    }
+                    Err(e) => {
+                        error!("Navigation search failed for {}: {}", search_type, e);
+                    }
+                }
+            }
+
+            return Ok(CallToolResult::structured(json!({
+                "query": query,
+                "search_types": search_types,
+                "total_results": all_results.len(),
+                "limit": limit,
+                "embedding_mode": "helixdb",
+                "results": all_results
+            })));
+        }
+
+        // MCP mode: Generate embedding
+        if self.config.is_mcp_embedding_enabled() {
+            info!("Using MCP embedding mode");
+            
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            let query_embedding = match self.generate_embedding(query, &api_key).await {
+                Ok(embedding) => {
+                    info!("✓ Generated embedding vector with {} dimensions", embedding.len());
+                    embedding
+                }
+                Err(e) => {
+                    error!("✗ Failed to generate embedding: {}", e);
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Embedding generation failed: {}", e),
+                        "suggestion": "Check API key, network connection, and server status"
+                    })));
+                }
+            };
+
+            let mut all_results = Vec::new();
+            
+            for search_type in search_types {
+                let query_name = match search_type.as_str() {
+                    "hubs" => "search_navigation_hubs",
+                    "waypoints" => "search_navigation_waypoints",
+                    "paths" => "search_direction_paths",
+                    _ => {
+                        info!("Skipping unsupported search type: {}", search_type);
+                        continue;
+                    }
+                };
+
+                let mut payload = json!({
+                    "query_embedding": query_embedding,
+                    "limit": limit,
+                });
+
+                if let Some(business_id) = &params.0.business_id {
+                    payload["business_id"] = json!(business_id);
+                }
+
+                match self.helix_client.query(query_name, payload).await {
+                    Ok(results) => {
+                        if let Some(array) = results.as_array() {
+                            all_results.extend(array.iter().cloned());
+                        }
+                    }
+                    Err(e) => {
+                        error!("Navigation search failed for {}: {}", search_type, e);
+                    }
+                }
+            }
+
+            return Ok(CallToolResult::structured(json!({
+                "query": query,
+                "search_types": search_types,
+                "total_results": all_results.len(),
+                "limit": limit,
+                "embedding_mode": "mcp",
+                "results": all_results
+            })));
+        }
+
+        Ok(CallToolResult::structured_error(json!({
+            "error": "Invalid embedding configuration. Check mcpconfig.toml"
+        })))
+    }
+
+    // ========================================================================
     // UPDATE TOOLS - Modify existing memories
     // ========================================================================
 
@@ -862,162 +2139,85 @@ impl HelixMcpServer {
         
         info!("update_business_memory: memory_id={}, type={}", memory_id, memory_type);
 
-        // Check if description is being updated and we need to regenerate embedding
-        let description_changed = updates.get("description").is_some() || 
-                                 updates.get("text_description").is_some();
-        
-        let mut embedding_regenerated = false;
-        
-        // If description changed and we're in MCP mode, regenerate embedding
-        if description_changed && self.config.is_mcp_embedding_enabled() {
-            info!("Description changed in MCP mode - regenerating embedding for {} {}", memory_type, memory_id);
-            
-            // Get the new description text
-            let description_text = updates.get("description")
-                .or(updates.get("text_description"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_request("Description field must be a string", None))?;
-            
-            // Get API key for embedding generation
-            let api_key = self.config.get_api_key().unwrap_or_default();
-            
-            // Generate new embedding
-            match self.generate_embedding(description_text, &api_key).await {
-                Ok(embedding) => {
-                    info!("Generated new embedding, deleting old embedding node...");
-                    
-                    // Delete old embedding (follows pattern from delete queries)
-                    let delete_query = match memory_type.as_str() {
-                        "product" => "delete_product_embedding_edge_only",
-                        "service" => "delete_service_embedding_edge_only",
-                        "location" => "delete_location_embedding_edge_only",
-                        "hours" => "delete_hours_embedding_edge_only",
-                        "social" => "delete_social_embedding_edge_only",
-                        "policy" => "delete_policy_embedding_edge_only",
-                        "event" => "delete_event_embedding_edge_only",
-                        _ => {
-                            warn!("No embedding delete query for type: {}", memory_type);
-                            ""
-                        }
-                    };
-                    
-                    if !delete_query.is_empty() {
-                        let delete_payload = json!({
-                            format!("{}_id", memory_type): memory_id
-                        });
-                        
-                        match self.helix_client.query(delete_query, delete_payload).await {
-                            Ok(_) => info!("Deleted old embedding edge"),
-                            Err(e) => warn!("Failed to delete old embedding (may not exist): {}", e)
-                        }
-                    }
-                    
-                    // Create new embedding node and link it
-                    // Note: This follows the same pattern as create_business_memory
-                    let embedding_id = format!("{}_{}_emb_{}", memory_type, memory_id, chrono::Utc::now().timestamp());
-                    let model_name = match self.config.embedding.provider {
-                        Some(_) => {
-                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
-                        }
-                        None => "unknown".to_string()
-                    };
-                    
-                    let add_embedding_payload = json!({
-                        "embedding_id": embedding_id,
-                        "embedding": embedding,
-                        "model": model_name,
-                        "created_at": chrono::Utc::now().timestamp()
-                    });
-                    
-                    // Add vector node
-                    let add_vector_query = format!("add_{}_embedding_vector", memory_type);
-                    if let Err(e) = self.helix_client.query(&add_vector_query, add_embedding_payload).await {
-                        error!("Failed to create new embedding vector: {}", e);
-                        // Continue anyway - update the main node even if embedding fails
-                    } else {
-                        // Link the embedding to the memory node
-                        let link_payload = json!({
-                            format!("{}_id", memory_type): memory_id,
-                            "embedding_id": embedding_id
-                        });
-                        
-                        let link_query = format!("link_{}_to_embedding", memory_type);
-                        if let Err(e) = self.helix_client.query(&link_query, link_payload).await {
-                            error!("Failed to link new embedding: {}", e);
-                        } else {
-                            info!("Successfully regenerated and linked new embedding");
-                            embedding_regenerated = true;
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to generate new embedding: {}", e);
-                    // Continue with update even if embedding generation fails
-                }
-            }
-        }
+        // Extract composite_text from updates (required for vector-aware update queries)
+        let composite_text = updates.get("composite_text")
+            .or(updates.get("text_description"))
+            .or(updates.get("description"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_request(
+                "Missing required field: composite_text (or text_description/description)", 
+                None
+            ))?;
 
-        // Determine which update query to use based on memory_type and fields
+        // Route to appropriate vector-aware update query
         let query_name = match memory_type.as_str() {
-            "product" => {
-                // Check which fields are being updated
-                if updates.get("price").is_some() && updates.as_object().map(|o| o.len()) == Some(1) {
-                    "update_product_price"
-                } else if updates.get("availability").is_some() && updates.as_object().map(|o| o.len()) == Some(1) {
-                    "update_product_availability"
-                } else {
-                    "update_product_full"
-                }
-            },
-            "service" => {
-                if updates.get("price").is_some() && updates.as_object().map(|o| o.len()) == Some(1) {
-                    "update_service_price"
-                } else if updates.get("availability").is_some() && updates.as_object().map(|o| o.len()) == Some(1) {
-                    "update_service_availability"
-                } else {
-                    "update_service_full"
-                }
-            },
-            "location" => "update_location_address",
-            "hours" => "update_business_hours_monday",
-            "social" => "update_social_stats",
-            "policy" => "update_policy_content",
-            "event" => "update_event_dates",
+            "product" => "update_business_product_memory",
+            "service" => "update_business_service_memory",
+            "location" => "update_business_location_memory",
+            "hours" => "update_business_hours_memory",
+            "social" => "update_business_social_memory",
+            "policy" => "update_business_policy_memory",
+            "event" => "update_business_event_memory",
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid: product, service, location, hours, social, policy, event", memory_type)
                 })));
             }
         };
 
-        // Merge memory_id with updates
-        let mut payload = updates.clone();
-        if let Some(obj) = payload.as_object_mut() {
-            obj.insert(format!("{}_id", memory_type), json!(memory_id));
-            obj.insert("updated_at".to_string(), json!(chrono::Utc::now().timestamp()));
-        }
+        // Generate embedding based on mode
+        let new_embedding = if self.config.is_mcp_embedding_enabled() {
+            // MCP Mode: Generate embedding via OpenAI/Gemini/Local/TCP
+            info!("MCP mode: Generating new embedding for {} {}", memory_type, memory_id);
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(composite_text, &api_key).await {
+                Ok(emb) => emb,
+                Err(e) => {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e)
+                    })));
+                }
+            }
+        } else {
+            // HelixDB Mode: Use empty vector (HelixDB will generate via Embed() function)
+            info!("HelixDB mode: Using empty embedding placeholder for {} {}", memory_type, memory_id);
+            vec![]
+        };
 
-        // Execute the query
+        // Build payload for vector-aware update query
+        let timestamp = chrono::Utc::now().timestamp();
+        let payload = json!({
+            "memory_id": memory_id,
+            "composite_text": composite_text,
+            "new_embedding": new_embedding,
+            "timestamp": timestamp
+        });
+
+        // Execute vector-aware update query (DROP old vector + CREATE new one)
         match self.helix_client.query(query_name, payload).await {
             Ok(result) => {
                 Ok(CallToolResult::structured(json!({
                     "success": true,
                     "memory_type": memory_type,
                     "memory_id": memory_id,
-                    "embedding_regenerated": embedding_regenerated,
+                    "query_used": query_name,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "updated_at": timestamp,
                     "result": result
                 })))
             }
             Err(e) => {
                 error!("update_business_memory failed: {}", e);
                 Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Failed to update {} memory: {}", memory_type, e)
+                    "error": format!("Failed to update {} memory: {}", memory_type, e),
+                    "query_used": query_name
                 })))
             }
         }
     }
 
-    #[tool(description = "Update existing customer memory - modify behaviors, preferences, desires, rules, or feedback")]
+    #[tool(description = "Update existing customer memory - modify behaviors, preferences, desires, rules, feedback, or communication history")]
     async fn update_customer_memory(&self, params: Parameters<UpdateCustomerMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type = &params.0.memory_type;
@@ -1025,136 +2225,217 @@ impl HelixMcpServer {
         
         info!("update_customer_memory: memory_id={}, type={}", memory_id, memory_type);
 
-        // Check if text fields are being updated and we need to regenerate embedding
-        let text_changed = updates.get("text_description").is_some() || 
-                          updates.get("context").is_some() ||
-                          updates.get("subject").is_some();
-        
-        let mut embedding_regenerated = false;
-        
-        // If text changed and we're in MCP mode, regenerate embedding
-        if text_changed && self.config.is_mcp_embedding_enabled() {
-            info!("Text content changed in MCP mode - regenerating embedding for {} {}", memory_type, memory_id);
-            
-            // Get the new text content
-            let text_content = updates.get("text_description")
-                .or(updates.get("context"))
-                .or(updates.get("subject"))
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_request("Text field must be a string", None))?;
-            
-            // Get API key for embedding generation
-            let api_key = self.config.get_api_key().unwrap_or_default();
-            
-            // Generate new embedding
-            match self.generate_embedding(text_content, &api_key).await {
-                Ok(embedding) => {
-                    info!("Generated new embedding, deleting old embedding node...");
-                    
-                    // Delete old embedding (follows pattern from delete queries)
-                    let delete_query = match memory_type.as_str() {
-                        "behavior" => "delete_behavior_embedding_edge_only",
-                        "preference" => "delete_preference_embedding_edge_only",
-                        "desire" => "delete_desire_embedding_edge_only",
-                        "rule" => "delete_rule_embedding_edge_only",
-                        "feedback" => "delete_feedback_embedding_edge_only",
-                        _ => {
-                            warn!("No embedding delete query for type: {}", memory_type);
-                            ""
-                        }
-                    };
-                    
-                    if !delete_query.is_empty() {
-                        let delete_payload = json!({
-                            format!("{}_id", memory_type): memory_id
-                        });
-                        
-                        match self.helix_client.query(delete_query, delete_payload).await {
-                            Ok(_) => info!("Deleted old embedding edge"),
-                            Err(e) => warn!("Failed to delete old embedding (may not exist): {}", e)
-                        }
-                    }
-                    
-                    // Create new embedding node and link it
-                    let embedding_id = format!("{}_{}_emb_{}", memory_type, memory_id, chrono::Utc::now().timestamp());
-                    let model_name = match self.config.embedding.provider {
-                        Some(_) => {
-                            self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
-                        }
-                        None => "unknown".to_string()
-                    };
-                    
-                    let add_embedding_payload = json!({
-                        "embedding_id": embedding_id,
-                        "embedding": embedding,
-                        "model": model_name,
-                        "created_at": chrono::Utc::now().timestamp()
-                    });
-                    
-                    // Add vector node
-                    let add_vector_query = format!("add_{}_embedding_vector", memory_type);
-                    if let Err(e) = self.helix_client.query(&add_vector_query, add_embedding_payload).await {
-                        error!("Failed to create new embedding vector: {}", e);
-                        // Continue anyway - update the main node even if embedding fails
-                    } else {
-                        // Link the embedding to the memory node
-                        let link_payload = json!({
-                            format!("{}_id", memory_type): memory_id,
-                            "embedding_id": embedding_id
-                        });
-                        
-                        let link_query = format!("link_{}_to_embedding", memory_type);
-                        if let Err(e) = self.helix_client.query(&link_query, link_payload).await {
-                            error!("Failed to link new embedding: {}", e);
-                        } else {
-                            info!("Successfully regenerated and linked new embedding");
-                            embedding_regenerated = true;
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to generate new embedding: {}", e);
-                    // Continue with update even if embedding generation fails
-                }
-            }
-        }
+        // Extract composite_text from updates (required for vector-aware update queries)
+        let composite_text = updates.get("composite_text")
+            .or(updates.get("text_description"))
+            .or(updates.get("context"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_request(
+                "Missing required field: composite_text (or text_description/context)", 
+                None
+            ))?;
 
-        // Determine which update query to use
+        // Route to appropriate vector-aware update query
         let query_name = match memory_type.as_str() {
-            "behavior" => "update_behavior_context",
-            "preference" => "update_preference_strength",
-            "desire" => "update_desire_priority",
-            "rule" => "update_rule_enforcement",
-            "feedback" => "update_feedback_rating",
+            "preference" => "update_customer_preference_memory",
+            "behavior" => "update_customer_behavior_memory",
+            "desire" => "update_customer_desire_memory",
+            "rule" => "update_customer_rule_memory",
+            "feedback" => "update_customer_feedback_memory",
+            "communication" => "update_customer_communication_memory",
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid types: behavior, preference, desire, rule, feedback", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid: preference, behavior, desire, rule, feedback, communication", memory_type)
                 })));
             }
         };
 
-        // Merge memory_id with updates
-        let mut payload = updates.clone();
-        if let Some(obj) = payload.as_object_mut() {
-            obj.insert(format!("{}_id", memory_type), json!(memory_id));
-            obj.insert("updated_at".to_string(), json!(chrono::Utc::now().timestamp()));
-        }
+        // Generate embedding based on mode
+        let new_embedding = if self.config.is_mcp_embedding_enabled() {
+            // MCP Mode: Generate embedding via OpenAI/Gemini/Local/TCP
+            info!("MCP mode: Generating new embedding for {} {}", memory_type, memory_id);
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(composite_text, &api_key).await {
+                Ok(emb) => emb,
+                Err(e) => {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e)
+                    })));
+                }
+            }
+        } else {
+            // HelixDB Mode: Use empty vector (HelixDB will generate via Embed() function)
+            info!("HelixDB mode: Using empty embedding placeholder for {} {}", memory_type, memory_id);
+            vec![]
+        };
 
-        // Execute the query
+        // Build payload for vector-aware update query
+        let timestamp = chrono::Utc::now().timestamp();
+        let payload = json!({
+            "memory_id": memory_id,
+            "composite_text": composite_text,
+            "new_embedding": new_embedding,
+            "timestamp": timestamp
+        });
+
+        // Execute vector-aware update query (DROP old vector + CREATE new one)
         match self.helix_client.query(query_name, payload).await {
             Ok(result) => {
                 Ok(CallToolResult::structured(json!({
                     "success": true,
                     "memory_type": memory_type,
                     "memory_id": memory_id,
-                    "embedding_regenerated": embedding_regenerated,
+                    "query_used": query_name,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "updated_at": timestamp,
                     "result": result
                 })))
             }
             Err(e) => {
                 error!("update_customer_memory failed: {}", e);
                 Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Failed to update {} memory: {}", memory_type, e)
+                    "error": format!("Failed to update {} memory: {}", memory_type, e),
+                    "query_used": query_name
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Update customer interaction - modify product or service interaction details and regenerate embeddings")]
+    async fn update_interaction(&self, params: Parameters<UpdateInteractionParam>) -> Result<CallToolResult, McpError> {
+        let interaction_id = &params.0.interaction_id;
+        let interaction_type = &params.0.interaction_type;
+        let composite_text = &params.0.composite_text;
+        
+        info!("update_interaction: interaction_id={}, type={}", interaction_id, interaction_type);
+
+        // Route to appropriate vector-aware update query
+        let query_name = match interaction_type.as_str() {
+            "product" => "update_customer_product_interaction_memory",
+            "service" => "update_customer_service_interaction_memory",
+            _ => {
+                return Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Invalid interaction_type: {}. Valid: product, service", interaction_type)
+                })));
+            }
+        };
+
+        // Generate embedding based on mode
+        let new_embedding = if self.config.is_mcp_embedding_enabled() {
+            info!("MCP mode: Generating new embedding for {} interaction {}", interaction_type, interaction_id);
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(composite_text, &api_key).await {
+                Ok(emb) => emb,
+                Err(e) => {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e)
+                    })));
+                }
+            }
+        } else {
+            info!("HelixDB mode: Using empty embedding placeholder for {} interaction {}", interaction_type, interaction_id);
+            vec![]
+        };
+
+        // Build payload for vector-aware update query
+        let timestamp = chrono::Utc::now().timestamp();
+        let payload = json!({
+            "memory_id": interaction_id,
+            "composite_text": composite_text,
+            "new_embedding": new_embedding,
+            "timestamp": timestamp
+        });
+
+        // Execute vector-aware update query
+        match self.helix_client.query(query_name, payload).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "interaction_type": interaction_type,
+                    "interaction_id": interaction_id,
+                    "query_used": query_name,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "updated_at": timestamp,
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("update_interaction failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to update {} interaction: {}", interaction_type, e),
+                    "query_used": query_name
+                })))
+            }
+        }
+    }
+
+    #[tool(description = "Update navigation memory - modify navigation hub, waypoint, or direction path and regenerate embeddings")]
+    async fn update_navigation(&self, params: Parameters<UpdateNavigationParam>) -> Result<CallToolResult, McpError> {
+        let memory_id = &params.0.memory_id;
+        let navigation_type = &params.0.navigation_type;
+        let composite_text = &params.0.composite_text;
+        
+        info!("update_navigation: memory_id={}, type={}", memory_id, navigation_type);
+
+        // Route to appropriate vector-aware update query
+        let query_name = match navigation_type.as_str() {
+            "hub" => "update_business_navigation_hub_memory",
+            "waypoint" => "update_navigation_waypoint_memory",
+            "path" => "update_direction_path_memory",
+            _ => {
+                return Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Invalid navigation_type: {}. Valid: hub, waypoint, path", navigation_type)
+                })));
+            }
+        };
+
+        // Generate embedding based on mode
+        let new_embedding = if self.config.is_mcp_embedding_enabled() {
+            info!("MCP mode: Generating new embedding for navigation {} {}", navigation_type, memory_id);
+            let api_key = self.config.get_api_key().unwrap_or_default();
+            
+            match self.generate_embedding(composite_text, &api_key).await {
+                Ok(emb) => emb,
+                Err(e) => {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to generate embedding: {}", e)
+                    })));
+                }
+            }
+        } else {
+            info!("HelixDB mode: Using empty embedding placeholder for navigation {} {}", navigation_type, memory_id);
+            vec![]
+        };
+
+        // Build payload for vector-aware update query
+        let timestamp = chrono::Utc::now().timestamp();
+        let payload = json!({
+            "memory_id": memory_id,
+            "composite_text": composite_text,
+            "new_embedding": new_embedding,
+            "timestamp": timestamp
+        });
+
+        // Execute vector-aware update query
+        match self.helix_client.query(query_name, payload).await {
+            Ok(result) => {
+                Ok(CallToolResult::structured(json!({
+                    "success": true,
+                    "navigation_type": navigation_type,
+                    "memory_id": memory_id,
+                    "query_used": query_name,
+                    "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
+                    "updated_at": timestamp,
+                    "result": result
+                })))
+            }
+            Err(e) => {
+                error!("update_navigation failed: {}", e);
+                Ok(CallToolResult::structured_error(json!({
+                    "error": format!("Failed to update navigation {}: {}", navigation_type, e),
+                    "query_used": query_name
                 })))
             }
         }
@@ -1164,31 +2445,118 @@ impl HelixMcpServer {
     // DELETE TOOLS - Remove memories
     // ========================================================================
 
-    #[tool(description = "Delete memory - remove products, services, locations, behaviors, preferences, etc.")]
+    #[tool(description = "Delete memory - remove products, services, locations, behaviors, preferences, etc. Supports cascade deletes and complete entity removal")]
     async fn delete_memory(&self, params: Parameters<DeleteMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type = &params.0.memory_type;
-        let delete_embedding = params.0.delete_embedding.unwrap_or(true);
+        let delete_strategy = params.0.delete_strategy.as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| {
+                // Backward compatibility: if delete_embedding is specified, use it
+                if params.0.delete_embedding.unwrap_or(true) {
+                    "with_embedding"
+                } else {
+                    "node_only"
+                }
+            });
         
-        info!("delete_memory: memory_id={}, type={}, delete_embedding={}", memory_id, memory_type, delete_embedding);
+        info!("delete_memory: memory_id={}, type={}, strategy={}", memory_id, memory_type, delete_strategy);
 
+        // Handle cascade and complete deletion strategies
+        match delete_strategy {
+            "cascade" => {
+                // Delete all memories for a business or customer
+                let query_name = match memory_type.as_str() {
+                    "business" => "delete_all_business_memories",
+                    "customer" => "delete_all_customer_memories",
+                    _ => {
+                        return Ok(CallToolResult::structured_error(json!({
+                            "error": "Cascade delete strategy only valid for memory_type: business, customer"
+                        })));
+                    }
+                };
+
+                let payload = json!({
+                    format!("{}_id", memory_type): memory_id
+                });
+
+                match self.helix_client.query(query_name, payload).await {
+                    Ok(result) => {
+                        return Ok(CallToolResult::structured(json!({
+                            "success": true,
+                            "memory_type": memory_type,
+                            "memory_id": memory_id,
+                            "strategy": "cascade",
+                            "message": format!("Deleted all memories for {}", memory_type),
+                            "result": result
+                        })));
+                    }
+                    Err(e) => {
+                        error!("Cascade delete failed: {}", e);
+                        return Ok(CallToolResult::structured_error(json!({
+                            "error": format!("Failed to cascade delete: {}", e)
+                        })));
+                    }
+                }
+            }
+            "complete" => {
+                // Delete entity and all associated memories
+                let query_name = match memory_type.as_str() {
+                    "business" => "delete_business_complete",
+                    "customer" => "delete_customer_complete",
+                    _ => {
+                        return Ok(CallToolResult::structured_error(json!({
+                            "error": "Complete delete strategy only valid for memory_type: business, customer"
+                        })));
+                    }
+                };
+
+                let payload = json!({
+                    format!("{}_id", memory_type): memory_id
+                });
+
+                match self.helix_client.query(query_name, payload).await {
+                    Ok(result) => {
+                        return Ok(CallToolResult::structured(json!({
+                            "success": true,
+                            "memory_type": memory_type,
+                            "memory_id": memory_id,
+                            "strategy": "complete",
+                            "message": format!("Completely deleted {} and all associated memories", memory_type),
+                            "result": result
+                        })));
+                    }
+                    Err(e) => {
+                        error!("Complete delete failed: {}", e);
+                        return Ok(CallToolResult::structured_error(json!({
+                            "error": format!("Failed to complete delete: {}", e)
+                        })));
+                    }
+                }
+            }
+            _ => {}  // Fall through to normal delete
+        }
+
+        // Normal delete (node_only or with_embedding)
+        let with_embedding = delete_strategy == "with_embedding";
+        
         // Determine which delete query to use
         let query_name = match memory_type.as_str() {
-            "product" => if delete_embedding { "delete_product_with_embedding" } else { "delete_product" },
-            "service" => if delete_embedding { "delete_service_with_embedding" } else { "delete_service" },
-            "location" => if delete_embedding { "delete_location_with_embedding" } else { "delete_location" },
-            "hours" => if delete_embedding { "delete_hours_with_embedding" } else { "delete_hours" },
-            "social" => if delete_embedding { "delete_social_with_embedding" } else { "delete_social" },
-            "policy" => if delete_embedding { "delete_policy_with_embedding" } else { "delete_policy" },
-            "event" => if delete_embedding { "delete_event_with_embedding" } else { "delete_event" },
-            "behavior" => if delete_embedding { "delete_behavior_with_embedding" } else { "delete_behavior" },
-            "preference" => if delete_embedding { "delete_preference_with_embedding" } else { "delete_preference" },
-            "desire" => if delete_embedding { "delete_desire_with_embedding" } else { "delete_desire" },
-            "rule" => if delete_embedding { "delete_rule_with_embedding" } else { "delete_rule" },
-            "feedback" => if delete_embedding { "delete_feedback_with_embedding" } else { "delete_feedback" },
+            "product" => if with_embedding { "delete_product_with_embedding" } else { "delete_product" },
+            "service" => if with_embedding { "delete_service_with_embedding" } else { "delete_service" },
+            "location" => if with_embedding { "delete_location_with_embedding" } else { "delete_location" },
+            "hours" => if with_embedding { "delete_hours_with_embedding" } else { "delete_hours" },
+            "social" => if with_embedding { "delete_social_with_embedding" } else { "delete_social" },
+            "policy" => if with_embedding { "delete_policy_with_embedding" } else { "delete_policy" },
+            "event" => if with_embedding { "delete_event_with_embedding" } else { "delete_event" },
+            "behavior" => if with_embedding { "delete_behavior_with_embedding" } else { "delete_behavior" },
+            "preference" => if with_embedding { "delete_preference_with_embedding" } else { "delete_preference" },
+            "desire" => if with_embedding { "delete_desire_with_embedding" } else { "delete_desire" },
+            "rule" => if with_embedding { "delete_rule_with_embedding" } else { "delete_rule" },
+            "feedback" => if with_embedding { "delete_feedback_with_embedding" } else { "delete_feedback" },
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event, behavior, preference, desire, rule, feedback", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event, behavior, preference, desire, rule, feedback, business, customer", memory_type)
                 })));
             }
         };
@@ -1205,7 +2573,8 @@ impl HelixMcpServer {
                     "success": true,
                     "memory_type": memory_type,
                     "memory_id": memory_id,
-                    "deleted_embedding": delete_embedding,
+                    "strategy": delete_strategy,
+                    "deleted_embedding": with_embedding,
                     "result": result
                 })))
             }
@@ -1541,20 +2910,28 @@ impl ServerHandler for HelixMcpServer {
                 .enable_resources()
                 .build(),
             instructions: Some(
-                "AI Memory Layer MCP Server - Provides intelligent access to business and customer memories.\n\n\
-                PRIMARY TOOLS (Use These First):\n\
-                - query_business_memory: Get products, services, locations, hours, social media, policies, or events\n\
-                - query_customer_memory: Get behaviors, preferences, desires, rules, or feedback\n\
-                - create_business_memory: Add products, services, locations, hours, social media, policies, or events\n\
-                - create_customer_memory: Add behaviors, preferences, desires, rules, or feedback\n\
-                - update_business_memory: Update products, services, locations, hours, social media, policies, or events\n\
-                - update_customer_memory: Update behaviors, preferences, desires, rules, or feedback\n\
-                - delete_memory: Remove any memory type (business or customer)\n\
-                - search_semantic: AI-powered semantic search across memories\n\
-                - find_customer_insights: Discover customer-product/service relationships\n\n\
-                ADVANCED TOOL (Last Resort Only):\n\
-                - do_query: Direct HelixDB query execution - use ONLY when primary tools cannot accomplish the task\n\n\
-                Total: 10 tools (9 primary + 1 advanced).".to_string()
+                "AI Memory Layer - Business & customer intelligence system.\n\n\
+                SEARCH STRATEGY: Use search_bm25 for exact terms/IDs/numbers, search_semantic for concepts.\n\n\
+                CORE TOOLS:\n\
+                • query_business_memory / query_customer_memory - Filter by criteria\n\
+                • search_semantic - Find by meaning (concepts, similar ideas)\n\
+                • search_bm25 - Find by keywords (exact matches, IDs, phone numbers)\n\
+                • create_business_memory / create_customer_memory - Add new memories\n\
+                • update_business_memory / update_customer_memory - Modify existing\n\
+                • delete_memory - Remove memories\n\n\
+                INTERACTIONS:\n\
+                • create_customer_product_interaction - Track product engagement\n\
+                • create_customer_service_interaction - Track service usage\n\
+                • query_customer_interactions / search_customer_interactions - Find interactions\n\
+                • update_interaction - Modify interactions\n\n\
+                NAVIGATION:\n\
+                • create_navigation_hub / create_navigation_waypoint / create_direction_path\n\
+                • query_navigation / search_navigation - Get directions\n\
+                • update_navigation - Modify navigation\n\n\
+                INSIGHTS:\n\
+                • find_customer_insights - Discover customer relationships\n\n\
+                ADVANCED:\n\
+                • do_query - Direct database queries (last resort)".to_string()
             ),
             ..Default::default()
         }
@@ -1601,166 +2978,87 @@ impl ServerHandler for HelixMcpServer {
             "meta://about" => {
                 "# AI Memory Layer MCP Server\n\n\
                 Version: 0.1.0\n\n\
-                ## Overview\n\
-                MCP server providing access to business and customer memories stored in HelixDB.\n\n\
-                ## Tools\n\
-                - 4 Query Tools: Read business/customer data\n\
-                - 2 Create Tools: Add new memories\n\
-                - 2 Update Tools: Modify existing memories\n\
-                - 1 Delete Tool: Remove memories\n\
-                - 1 Advanced Tool: Direct query execution (last resort)\n\n\
+                Business & customer intelligence system with semantic search.\n\n\
+                ## Tools (22 total)\n\
+                - 5 Search: query_business_memory, query_customer_memory, search_semantic, search_bm25, find_customer_insights\n\
+                - 8 Create: business, customer, product_interaction, service_interaction, navigation_hub, waypoint, direction_path\n\
+                - 4 Update: business, customer, interaction, navigation\n\
+                - 3 Query Specialized: customer_interactions, navigation\n\
+                - 1 Delete: all types\n\
+                - 1 Advanced: do_query\n\n\
                 ## Memory Types\n\
-                **Business**: Products, Services, Locations, Hours, Social Media, Policies, Events\n\
-                **Customer**: Behaviors, Preferences, Desires, Rules, Feedback\n\n\
-                ## Features\n\
-                - Filtering support\n\
-                - Vector embeddings for semantic search\n\
-                - Relationship queries"
+                Business: Products, Services, Locations, Hours, Social, Policies, Events\n\
+                Customer: Behaviors, Preferences, Desires, Rules, Feedback, Communication\n\
+                Interactions: Product, Service (node-based with reasons)\n\
+                Navigation: Hubs, Waypoints, Paths (with compass bearings)\n\n\
+                ## Search\n\
+                - search_bm25: Keywords (exact, fast)\n\
+                - search_semantic: Meaning (concepts, similar)"
             },
             "meta://instructions" => {
                 "# AI Memory Layer - Usage Instructions\n\n\
-                ## Tool Hierarchy\n\n\
-                **USE PRIMARY TOOLS FIRST** (covers 95% of use cases):\n\
-                - query_business_memory, query_customer_memory\n\
-                - create_business_memory, create_customer_memory\n\
-                - update_business_memory, update_customer_memory\n\
-                - delete_memory\n\
-                - search_semantic, find_customer_insights\n\n\
-                **USE ADVANCED TOOL ONLY AS LAST RESORT**:\n\
-                - do_query: When primary tools cannot accomplish the task\n\n\
+                ## Search Strategy\n\
+                1. Exact match (ID/phone/keyword)? → search_bm25\n\
+                2. Conceptual search? → search_semantic\n\
+                3. Not sure? Try search_bm25 first\n\n\
+                ## Core Operations\n\n\
+                **Query**: query_business_memory, query_customer_memory\n\
+                **Search**: search_bm25 (keywords), search_semantic (meaning)\n\
+                **Create**: create_business_memory, create_customer_memory\n\
+                **Update**: update_business_memory, update_customer_memory\n\
+                **Delete**: delete_memory\n\n\
+                ## Interactions\n\
+                **Create**: create_customer_product_interaction, create_customer_service_interaction\n\
+                **Query**: query_customer_interactions, search_customer_interactions\n\
+                **Update**: update_interaction\n\n\
+                ## Navigation\n\
+                **Create**: create_navigation_hub, create_navigation_waypoint, create_direction_path\n\
+                **Query**: query_navigation, search_navigation\n\
+                **Update**: update_navigation\n\n\
                 ## Examples\n\n\
-                ### Query Business Memories\n\
-                ```json\n\
-                {\n\
-                  \"business_id\": \"BIZ123\",\n\
-                  \"memory_type\": \"products\",\n\
-                  \"filters\": { \"price\": { \"lte\": 100.0 } }\n\
-                }\n\
-                ```\n\n\
-                ### Create New Memory\n\
-                ```json\n\
-                {\n\
-                  \"business_id\": \"BIZ123\",\n\
-                  \"memory_type\": \"product\",\n\
-                  \"data\": {\n\
-                    \"product_id\": \"PROD001\",\n\
-                    \"product_name\": \"Eco Bottle\",\n\
-                    \"price\": 25.99,\n\
-                    \"currency\": \"USD\"\n\
-                  }\n\
-                }\n\
-                ```\n\n\
-                ### Update Memory\n\
-                ```json\n\
-                {\n\
-                  \"memory_id\": \"PROD001\",\n\
-                  \"memory_type\": \"product\",\n\
-                  \"updates\": { \"price\": 29.99 }\n\
-                }\n\
-                ```\n\n\
-                ### Delete Memory\n\
-                ```json\n\
-                {\n\
-                  \"memory_id\": \"PROD001\",\n\
-                  \"memory_type\": \"product\",\n\
-                  \"delete_embedding\": true\n\
-                }\n\
-                ```\n\n\
-                ### Advanced: Direct Query (Last Resort)\n\
-                ```json\n\
-                {\n\
-                  \"endpoint\": \"get_business_products\",\n\
-                  \"payload\": { \"business_id\": \"BIZ123\" }\n\
-                }\n\
-                ```\n\n\
-                ## Filtering\n\
-                Range queries:\n\
-                ```json\n\
-                { \"price\": { \"lte\": 100.0, \"gte\": 50.0 } }\n\
-                ```\n\n\
-                Exact matches:\n\
-                ```json\n\
-                { \"availability\": \"in_stock\" }\n\
-                ```"
+                Search by keyword:\n\
+                search_bm25(query: \"headphones\", memory_types: [\"products\"])\n\n\
+                Search by concept:\n\
+                search_semantic(query: \"gifts for music lovers\", memory_types: [\"products\"])\n\n\
+                Track interaction:\n\
+                create_customer_product_interaction(\n\
+                  customer_id: \"C123\",\n\
+                  product_id: \"P456\",\n\
+                  interaction_type: \"purchased\",\n\
+                  text_reason: \"Needed for daily commute\"\n\
+                )\n\n\
+                Update with auto-refresh:\n\
+                update_business_memory(\n\
+                  memory_id: \"P456\",\n\
+                  memory_type: \"product\",\n\
+                  updates: {composite_text: \"New description\"}\n\
+                )"
             },
             "meta://schema" => {
                 "# AI Memory Layer Schema\n\n\
-                ## Business Memory Types\n\n\
-                ### 1. BusinessProductMemory\n\
-                - product_id, product_name, product_category\n\
-                - price, currency, availability\n\
-                - description, features, specifications\n\
-                - tags, seo_keywords\n\
-                - Vector embedding for semantic search\n\n\
-                ### 2. BusinessServiceMemory\n\
-                - service_id, service_name, service_category\n\
-                - price, currency, availability\n\
-                - duration, description, benefits\n\
-                - requirements, tags\n\
-                - Vector embedding\n\n\
-                ### 3. BusinessLocationMemory\n\
-                - location_id, location_name, location_type\n\
-                - address, city, state, country, postal_code\n\
-                - latitude, longitude\n\
-                - phone, email, website\n\
-                - Vector embedding\n\n\
-                ### 4. BusinessHoursMemory\n\
-                - hours_id, location_id\n\
-                - monday_open, monday_close\n\
-                - (tuesday through sunday)\n\
-                - special_hours, holidays\n\
-                - Vector embedding\n\n\
-                ### 5. BusinessSocialMediaMemory\n\
-                - social_id, platform, handle\n\
-                - profile_url, follower_count, post_count\n\
-                - engagement_rate, description\n\
-                - Vector embedding\n\n\
-                ### 6. BusinessPolicyMemory\n\
-                - policy_id, policy_type, policy_name\n\
-                - content, version, effective_date\n\
-                - is_active\n\
-                - Vector embedding\n\n\
-                ### 7. BusinessEventMemory\n\
-                - event_id, event_name, event_type\n\
-                - description, start_date, end_date\n\
-                - location, capacity, registration_url\n\
-                - Vector embedding\n\n\
-                ## Customer Memory Types\n\n\
-                ### 1. CustomerBehaviorMemory\n\
-                - behavior_id, customer_id\n\
-                - behavior_type, action, context\n\
-                - timestamp, channel, duration_seconds\n\
-                - Vector embedding\n\n\
-                ### 2. CustomerPreferenceMemory\n\
-                - preference_id, customer_id\n\
-                - preference_type, subject, strength\n\
-                - evidence_count, text_description\n\
-                - Vector embedding\n\n\
-                ### 3. CustomerDesireMemory\n\
-                - desire_id, customer_id\n\
-                - desire_type, goal, priority\n\
-                - timeline, budget_range\n\
-                - Vector embedding\n\n\
-                ### 4. CustomerRuleMemory\n\
-                - rule_id, customer_id\n\
-                - rule_type, condition, action\n\
-                - priority, enforcement, is_active\n\
-                - Vector embedding\n\n\
-                ### 5. CustomerFeedbackMemory\n\
-                - feedback_id, customer_id\n\
-                - subject, rating, sentiment\n\
-                - text_description, tags\n\
-                - Vector embedding\n\n\
-                ## Relationship Edges\n\
-                - CustomerLikedProduct (with text_reason)\n\
-                - CustomerDislikedProduct (with text_reason)\n\
-                - CustomerUsedService (with text_feedback)\n\
-                - CustomerVisitedLocation (with text_notes)\n\n\
-                ## Embedding Format\n\
-                - Model: text-embedding-3-small (OpenAI) or equivalent\n\
-                - Dimensions: 1536 (configurable)\n\
-                - Stored as F32 vector arrays\n\
-                - Used for hybrid search (vector + keyword)"
+                ## Business Memory (7 types)\n\
+                1. Product: product_id, name, category, price, currency, availability, description, features\n\
+                2. Service: service_id, name, category, price, duration, description, benefits\n\
+                3. Location: location_id, name, type, address, lat/lng, phone, email, website\n\
+                4. Hours: hours_id, location_id, daily hours (mon-sun), special_hours, holidays\n\
+                5. Social: social_id, platform, handle, profile_url, follower/post counts, engagement\n\
+                6. Policy: policy_id, type, name, content, version, effective_date, is_active\n\
+                7. Event: event_id, name, type, description, start/end dates, location, capacity\n\n\
+                ## Customer Memory (6 types)\n\
+                1. Behavior: behavior_id, customer_id, type, action, context, timestamp, channel\n\
+                2. Preference: preference_id, customer_id, type, subject, strength, evidence_count\n\
+                3. Desire: desire_id, customer_id, type, goal, priority, timeline, budget_range\n\
+                4. Rule: rule_id, customer_id, type, condition, action, priority, is_active\n\
+                5. Feedback: feedback_id, customer_id, subject, rating, sentiment, text\n\
+                6. Communication: communication_id, customer_id, channel, message, timestamp\n\n\
+                ## Interactions (node-based, 2 types)\n\
+                1. CustomerProductInteraction: interaction_id, customer_id, product_id, type (liked/purchased/viewed/reviewed), rating, channel, purchase_amount, text_reason\n\
+                2. CustomerServiceInteraction: interaction_id, customer_id, service_id, type (booked/completed/reviewed/canceled), satisfaction_rating, duration_actual, cost_actual, text_feedback\n\n\
+                ## Navigation (3 types)\n\
+                1. NavigationHub: navigation_id, business_id, address, lat/lng, what3words, plus_code, compass_bearing, building details, accessibility\n\
+                2. NavigationWaypoint: waypoint_id, navigation_id, name, type, description, visual/audio cues, compass_bearing, floor_level\n\
+                3. DirectionPath: path_id, navigation_id, name, type, transport_mode, duration, distance, compass waypoints, accessibility flags\n\n\
+                All types have vector embeddings for semantic search."
             },
             _ => {
                 return Err(McpError::resource_not_found(
@@ -1827,6 +3125,7 @@ async fn async_main() -> Result<()> {
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
         )
         .with_writer(std::io::stderr)
+        .without_time()
         .init();
 
     info!("");

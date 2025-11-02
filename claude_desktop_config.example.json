@@ -1,16 +1,7 @@
-# Example Claude Desktop Configuration
-# Location: %APPDATA%\Claude\claude_desktop_config.json (Windows)
-# Location: ~/Library/Application Support/Claude/claude_desktop_config.json (Mac)
-
 {
   "mcpServers": {
-    "helix-mcp": {
-      "command": "E:\\AI Whatsapp Bussiness\\ai_memory_layer\\src\\TCPMemoryServer\\helix_mcp_server\\target\\release\\helix-mcp-server.exe",
-      "env": {
-        "HELIX_ENDPOINT": "127.0.0.1",
-        "HELIX_PORT": "6969",
-        "RUST_LOG": "info"
-      }
+    "ai-memory": {
+      "command": "helix-mcp-server.exe"
     }
   }
 }

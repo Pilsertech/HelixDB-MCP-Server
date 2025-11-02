@@ -1,154 +1,134 @@
-# HelixDB MCP Server (Rust Implementation)
+# AI Memory Layer MCP Server
 
-A Rust implementation of the HelixDB MCP (Model Context Protocol) server, fully compatible with the Python [helix-py](https://github.com/HelixDB/helix-py) MCP server.
+Business and customer intelligence system with semantic search and relationship tracking.
 
-## Overview
+## What It Does
 
-This MCP server exposes HelixDB's graph traversal and search capabilities through the Model Context Protocol, allowing LLMs to interact with your HelixDB instance.
+Stores and retrieves business information (products, services, locations, hours, policies, events) and customer data (behaviors, preferences, desires, rules, feedback) with AI-powered search.
 
-**Based on:** [HelixDB MCP Documentation](https://docs.helix-db.com/features/mcp/helix-mcp)
+**Built on:** HelixDB graph database with vector embeddings
 
-## Features
+## Key Features
 
-### Session Management Tools
-- `init` - Initialize a new MCP traversal connection
-- `next` - Get the next item in traversal results
-- `collect` - Collect all items in traversal results
-- `reset` - Reset the MCP traversal connection
-- `schema_resource` - Get schema for the connection
+- **Two Search Modes**: Keyword search (fast, exact) and semantic search (meaning-based)
+- **Customer Interactions**: Track product/service engagement with reasons
+- **Navigation System**: Store directions with compass bearings and accessibility info
+- **Smart Updates**: Automatically maintains search indexes when data changes
+- **Relationship Discovery**: Find connections between customers and products/services
 
-### Graph Traversal Tools
-- `n_from_type` - Retrieve all nodes of a given type
-- `e_from_type` - Retrieve all edges of a given type
-- `out_step` - Traverse outward from current nodes/vectors
-- `out_e_step` - Traverse outward to edges
-- `in_step` - Traverse inward to nodes/vectors
-- `in_e_step` - Traverse inward to edges
+## Quick Start
 
-### Filter and Search Tools
-- `filter_items` - Filter current traversal state
-- `search_vector_text` - Similarity search using text query
-- `search_keyword` - BM25 keyword search
+### 1. Prerequisites
+- HelixDB server running (default: `127.0.0.1:6969`)
+- Rust 1.70+ (for building from source)
 
-## Prerequisites
+### 2. Configuration
+Create `mcpconfig.toml` (see `mcpconfig.example.toml`):
 
-- Rust 1.70 or higher
-- A running HelixDB instance (local or remote)
+```toml
+[helix]
+endpoint = "127.0.0.1"
+port = 6969
 
-## Installation
+[embedding]
+# Option 1: Let HelixDB generate embeddings (recommended)
+enabled = false
 
-### Build from source
-
-```bash
-cd helix_mcp_server
-cargo build --release
+# Option 2: Generate embeddings yourself
+enabled = true
+provider = "openai"  # or "gemini", "local", "tcp"
+model = "text-embedding-3-small"
+openai_api_key = "sk-..."
 ```
 
-The binary will be at `target/release/helix-mcp-server`
-
-## Configuration
-
-### Environment Variables
-
-- `HELIX_ENDPOINT` - HelixDB server endpoint (default: `127.0.0.1`)
-- `HELIX_PORT` - HelixDB server port (default: `6969`)
-- `RUST_LOG` - Logging level (default: `info`, options: `debug`, `info`, `warn`, `error`)
-
-## Usage
-
-### Standalone Mode (stdio transport)
-
-The server runs on stdio transport by default, which is compatible with Claude Desktop, Cursor, and other MCP clients:
+### 3. Build & Run
 
 ```bash
-# Set environment variables
-$env:HELIX_ENDPOINT="127.0.0.1"
-$env:HELIX_PORT="6969"
-
-# Run the server
+cargo build --release
 ./target/release/helix-mcp-server
 ```
 
-### Claude Desktop Configuration
+Or use pre-built binary from releases.
 
-Add to `%APPDATA%\Claude\claude_desktop_config.json`:
+## LLM Integration
 
+### Claude Desktop
+`%APPDATA%\Claude\claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "helix-mcp": {
-      "command": "E:\\path\\to\\helix-mcp-server.exe",
-      "env": {
-        "HELIX_ENDPOINT": "127.0.0.1",
-        "HELIX_PORT": "6969"
-      }
+    "ai-memory": {
+      "command": "E:\\path\\to\\helix-mcp-server.exe"
     }
   }
 }
 ```
 
-### Cursor Configuration
-
-In Cursor Settings > MCP & Integrations > New MCP Server:
-
+### Cursor / Windsurf
+Add to MCP servers configuration:
 ```json
 {
   "mcpServers": {
-    "helix-mcp": {
-      "command": "E:\\path\\to\\helix-mcp-server.exe",
-      "env": {
-        "HELIX_ENDPOINT": "127.0.0.1",
-        "HELIX_PORT": "6969"
-      }
+    "ai-memory": {
+      "command": "E:\\path\\to\\helix-mcp-server.exe"
     }
   }
 }
 ```
 
-### Windsurf Configuration
+## Usage Examples
 
-Go to Cascade settings > MCP Servers > Manage MCPs > View raw config:
-
-```json
-{
-  "mcpServers": {
-    "helix-mcp": {
-      "command": "E:\\path\\to\\helix-mcp-server.exe",
-      "env": {
-        "HELIX_ENDPOINT": "127.0.0.1",
-        "HELIX_PORT": "6969"
-      }
-    }
+### Store Business Info
+```
+LLM: create_business_memory(
+  business_id: "biz123",
+  memory_type: "product",
+  data: {
+    product_id: "prod_001",
+    name: "Wireless Headphones",
+    price: 99.99,
+    description: "Noise-canceling bluetooth headphones"
   }
-}
+)
 ```
 
-## Example Workflow
+### Search
+```
+# Keyword search (fast, exact)
+LLM: search_bm25(
+  query: "headphones",
+  memory_types: ["products"]
+)
 
-1. **Initialize a connection:**
-   ```
-   Call init() → Returns connection_id
-   ```
+# Semantic search (meaning-based)
+LLM: search_semantic(
+  query: "audio equipment for music lovers",
+  memory_types: ["products"]
+)
+```
 
-2. **Retrieve nodes of a specific type:**
-   ```
-   Call n_from_type(connection_id, "User") → Returns first user node
-   ```
+### Track Customer Interaction
+```
+LLM: create_customer_product_interaction(
+  customer_id: "cust456",
+  product_id: "prod_001",
+  interaction_id: "int_789",
+  interaction_type: "purchased",
+  text_reason: "Looking for quality headphones for commute"
+)
+```
 
-3. **Traverse relationships:**
-   ```
-   Call out_step(connection_id, "Follows", "node") → Returns connected nodes
-   ```
-
-4. **Get more results:**
-   ```
-   Call next(connection_id) → Returns next item in traversal
-   ```
-
-5. **Collect all results:**
-   ```
-   Call collect(connection_id) → Returns all remaining items
-   ```
+### Update with Auto-Refresh
+```
+LLM: update_business_memory(
+  memory_id: "prod_001",
+  memory_type: "product",
+  updates: {
+    composite_text: "Premium noise-canceling wireless headphones with 30hr battery"
+  }
+)
+# Automatically updates search indexes
+```
 
 6. **Filter results:**
    ```
@@ -197,42 +177,62 @@ $env:RUST_LOG="debug"
 ./helix-mcp-server
 ```
 
-### MCP client not connecting
+## Available Tools (22 total)
 
-1. Check the path to the binary in your MCP client configuration
-2. Ensure environment variables are set correctly
-3. Look at stderr output for error messages
+**Query & Search**
+- `query_business_memory` / `query_customer_memory` - Filter by criteria
+- `search_semantic` - Find by meaning
+- `search_bm25` - Find by keywords (use for exact matches/IDs)
+- `find_customer_insights` - Discover relationships
 
-## Development
+**Create**
+- `create_business_memory` / `create_customer_memory` - Add memories
+- `create_customer_product_interaction` / `create_customer_service_interaction` - Track interactions
+- `create_navigation_hub` / `create_navigation_waypoint` / `create_direction_path` - Add directions
 
-### Run in development mode
+**Update**
+- `update_business_memory` / `update_customer_memory` - Modify memories
+- `update_interaction` / `update_navigation` - Modify interactions/directions
 
-```bash
-cargo run
-```
+**Query Specialized**
+- `query_customer_interactions` / `search_customer_interactions` - Find interactions
+- `query_navigation` / `search_navigation` - Get directions
 
-### Run with debug logging
+**Delete**
+- `delete_memory` - Remove any memory type
 
-```bash
-RUST_LOG=debug cargo run
-```
+**Advanced**
+- `do_query` - Direct database queries (use primary tools first)
 
-### Run tests
+## Search Strategy
 
-```bash
-cargo test
-```
+1. **Exact match?** Use `search_bm25` (product IDs, phone numbers, exact terms)
+2. **Conceptual?** Use `search_semantic` (find similar products, related ideas)
+3. **Not sure?** Try `search_bm25` first, then `search_semantic`
 
-## Contributing
+## Troubleshooting
 
-This implementation follows the official HelixDB MCP specification from the Python reference implementation.
+**Connection fails:**
+- Verify HelixDB is running: `netstat -an | findstr :6969` (Windows)
+- Check `mcpconfig.toml` settings
 
-## License
+**Search returns nothing:**
+- Try both `search_bm25` and `search_semantic`
+- Verify data exists with `query_business_memory` or `query_customer_memory`
 
-Same as HelixDB project
+**LLM doesn't see tools:**
+- Restart LLM client after config changes
+- Check server logs for errors
 
-## Resources
+## Architecture
 
-- [HelixDB MCP Documentation](https://docs.helix-db.com/features/mcp/helix-mcp)
-- [HelixDB Python SDK](https://github.com/HelixDB/helix-py)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
+- **22 unified tools** route to **146+ database queries**
+- Smart routing by parameters (no tool explosion)
+- Automatic search index maintenance on updates
+- Two embedding modes: self-managed or HelixDB-generated
+
+## Documentation
+
+- `IMPLEMENTATION_COMPLETE.md` - Full technical details
+- `QUICK_REFERENCE.md` - Testing checklist and commands
+- `SYSTEM_VALIDATION.md` - Current status report
