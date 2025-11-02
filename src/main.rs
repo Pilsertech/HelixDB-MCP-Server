@@ -3245,7 +3245,8 @@ async fn async_main() -> Result<()> {
 
     let server = HelixMcpServer::new(helix_client, Arc::new(config));
     
-    info!(" MCP Server ready on stdio");
+    info!("🔧 MCP Server ready on stdio");
+    
     serve_server(server, stdio()).await?;
     
     Ok(())
