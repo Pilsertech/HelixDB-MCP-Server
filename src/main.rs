@@ -13,6 +13,7 @@ mod helix_client;
 mod session;
 mod config;
 mod embedding_client;
+mod server;
 
 use helix_client::HelixClient;
 use config::Config;
@@ -3243,11 +3244,17 @@ async fn async_main() -> Result<()> {
         }
     }
 
-    let server = HelixMcpServer::new(helix_client, Arc::new(config));
+    let server = HelixMcpServer::new(helix_client, Arc::new(config.clone()));
     
-    info!("🔧 MCP Server ready on stdio");
-    
-    serve_server(server, stdio()).await?;
+    // Start server based on transport mode from config
+    if config.server.transport == "tcp" {
+        let tcp_addr = format!("{}:{}", config.server.tcp_host, config.server.tcp_port);
+        info!("🔧 MCP Server ready - starting TCP server on {}", tcp_addr);
+        server::start_tcp_server(server, &tcp_addr, Arc::new(config.server)).await?;
+    } else {
+        info!("🔧 MCP Server ready - using stdio transport");
+        serve_server(server, stdio()).await?;
+    }
     
     Ok(())
 }

@@ -15,6 +15,55 @@ pub struct Config {
 pub struct ServerConfig {
     pub name: String,
     pub version: String,
+    #[serde(default = "default_transport")]
+    pub transport: String,
+    #[serde(default = "default_tcp_port")]
+    pub tcp_port: u16,
+    #[serde(default = "default_tcp_host")]
+    pub tcp_host: String,
+    // TCP Performance Optimization Settings
+    #[serde(default = "default_tcp_nodelay")]
+    pub tcp_nodelay: bool,
+    #[serde(default = "default_tcp_keepalive")]
+    pub tcp_keepalive: bool,
+    #[serde(default = "default_tcp_keepalive_idle")]
+    pub tcp_keepalive_idle: u64,
+    #[serde(default = "default_tcp_keepalive_interval")]
+    pub tcp_keepalive_interval: u64,
+    #[serde(default = "default_tcp_keepalive_retries")]
+    pub tcp_keepalive_retries: u32,
+}
+
+fn default_transport() -> String {
+    "stdio".to_string()
+}
+
+fn default_tcp_port() -> u16 {
+    8765
+}
+
+fn default_tcp_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_tcp_nodelay() -> bool {
+    true // Enable by default for low latency
+}
+
+fn default_tcp_keepalive() -> bool {
+    true // Enable by default for reliability
+}
+
+fn default_tcp_keepalive_idle() -> u64 {
+    60 // 60 seconds idle before probing
+}
+
+fn default_tcp_keepalive_interval() -> u64 {
+    10 // 10 seconds between probes
+}
+
+fn default_tcp_keepalive_retries() -> u32 {
+    3 // 3 retries before closing
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -147,6 +196,14 @@ impl Default for Config {
             server: ServerConfig {
                 name: "AI Memory Layer MCP Server".to_string(),
                 version: "0.1.0".to_string(),
+                transport: default_transport(),
+                tcp_port: default_tcp_port(),
+                tcp_host: default_tcp_host(),
+                tcp_nodelay: default_tcp_nodelay(),
+                tcp_keepalive: default_tcp_keepalive(),
+                tcp_keepalive_idle: default_tcp_keepalive_idle(),
+                tcp_keepalive_interval: default_tcp_keepalive_interval(),
+                tcp_keepalive_retries: default_tcp_keepalive_retries(),
             },
             helix: HelixConfig {
                 endpoint: "127.0.0.1".to_string(),

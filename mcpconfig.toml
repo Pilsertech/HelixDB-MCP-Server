@@ -4,6 +4,29 @@
 name = "AI Memory Layer MCP Server"
 version = "0.1.0"
 
+# MCP Transport Configuration
+# transport = "stdio"  # Default: stdio (for spawned processes)
+# transport = "tcp"    # Use TCP for faster, more reliable connections
+transport = "tcp"      # Options: "stdio" | "tcp"
+tcp_port = 8765        # Port to listen on when transport = "tcp"
+tcp_host = "127.0.0.1" # Host to bind to when transport = "tcp" (use "0.0.0.0" for all interfaces)
+
+# TCP Performance Optimization Settings (only used when transport = "tcp")
+# These settings control low-level TCP behavior for maximum speed and reliability
+tcp_nodelay = true     # Disable Nagle's algorithm (eliminates 40-200ms buffering delays)
+                       # true = send packets immediately (low latency)
+                       # false = buffer small packets (higher throughput for bulk data)
+                       # Recommendation: true for MCP (interactive request/response)
+
+tcp_keepalive = true   # Enable TCP keepalive to detect broken connections
+                       # true = detect dead connections automatically
+                       # false = connections may hang indefinitely
+                       # Recommendation: true for production
+
+tcp_keepalive_idle = 60    # Seconds of idle time before sending keepalive probes
+tcp_keepalive_interval = 10 # Seconds between keepalive probes
+tcp_keepalive_retries = 3   # Number of failed probes before closing connection
+
 [helix]
 endpoint = "127.0.0.1"
 port = 6969
