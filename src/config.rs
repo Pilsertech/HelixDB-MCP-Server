@@ -17,10 +17,19 @@ pub struct ServerConfig {
     pub version: String,
     #[serde(default = "default_transport")]
     pub transport: String,
+    // Enable/disable specific transports (can run multiple at once)
+    #[serde(default = "default_enable_tcp")]
+    pub enable_tcp: bool,
+    #[serde(default = "default_enable_http")]
+    pub enable_http: bool,
     #[serde(default = "default_tcp_port")]
     pub tcp_port: u16,
     #[serde(default = "default_tcp_host")]
     pub tcp_host: String,
+    #[serde(default = "default_http_port")]
+    pub http_port: u16,
+    #[serde(default = "default_http_host")]
+    pub http_host: String,
     // TCP Performance Optimization Settings
     #[serde(default = "default_tcp_nodelay")]
     pub tcp_nodelay: bool,
@@ -38,11 +47,27 @@ fn default_transport() -> String {
     "stdio".to_string()
 }
 
+fn default_enable_tcp() -> bool {
+    false // Disabled by default
+}
+
+fn default_enable_http() -> bool {
+    false // Disabled by default
+}
+
 fn default_tcp_port() -> u16 {
-    8765
+    8766 // Changed to unique port
 }
 
 fn default_tcp_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_http_port() -> u16 {
+    9527 // Unique port for HTTP
+}
+
+fn default_http_host() -> String {
     "127.0.0.1".to_string()
 }
 
@@ -197,6 +222,8 @@ impl Default for Config {
                 name: "AI Memory Layer MCP Server".to_string(),
                 version: "0.1.0".to_string(),
                 transport: default_transport(),
+                enable_tcp: default_enable_tcp(),
+                enable_http: default_enable_http(),
                 tcp_port: default_tcp_port(),
                 tcp_host: default_tcp_host(),
                 tcp_nodelay: default_tcp_nodelay(),
@@ -204,6 +231,8 @@ impl Default for Config {
                 tcp_keepalive_idle: default_tcp_keepalive_idle(),
                 tcp_keepalive_interval: default_tcp_keepalive_interval(),
                 tcp_keepalive_retries: default_tcp_keepalive_retries(),
+                http_host: default_http_host(),
+                http_port: default_http_port(),
             },
             helix: HelixConfig {
                 endpoint: "127.0.0.1".to_string(),

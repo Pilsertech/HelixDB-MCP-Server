@@ -1,211 +1,74 @@
-# MCP Server Configuration for AI Memory Layer
+# Example MCP Server Configuration
+# Copy this to mcpconfig.toml and customize
 
 [server]
 name = "AI Memory Layer MCP Server"
 version = "0.1.0"
 
-# MCP Transport Configuration
-# transport = "stdio"  # Default: stdio (for spawned processes)
-# transport = "tcp"    # Use TCP for faster, more reliable connections
-transport = "tcp"      # Options: "stdio" | "tcp"
-tcp_port = 8765        # Port to listen on when transport = "tcp"
-tcp_host = "127.0.0.1" # Host to bind to when transport = "tcp" (use "0.0.0.0" for all interfaces)
+# Transport mode: "stdio", "tcp", or "http" (for single mode only)
+# For multiple transports, use enable_tcp and enable_http flags below
+transport = "stdio"  # Default fallback
 
-# TCP Performance Optimization Settings (only used when transport = "tcp")
-# These settings control low-level TCP behavior for maximum speed and reliability
-tcp_nodelay = true     # Disable Nagle's algorithm (eliminates 40-200ms buffering delays)
-                       # true = send packets immediately (low latency)
-                       # false = buffer small packets (higher throughput for bulk data)
-                       # Recommendation: true for MCP (interactive request/response)
+# Enable multiple transports simultaneously
+enable_tcp = true   # Enable TCP server
+enable_http = true  # Enable HTTP server
 
-tcp_keepalive = true   # Enable TCP keepalive to detect broken connections
-                       # true = detect dead connections automatically
-                       # false = connections may hang indefinitely
-                       # Recommendation: true for production
+# TCP configuration
+tcp_host = "127.0.0.1"
+tcp_port = 8765  # Unique port for TCP
+tcp_nodelay = true  # Disable Nagle's algorithm for low latency
+tcp_keepalive = true  # Detect broken connections
+tcp_keepalive_idle = 60  # Seconds before probing
+tcp_keepalive_interval = 10  # Seconds between probes
 
-tcp_keepalive_idle = 60    # Seconds of idle time before sending keepalive probes
-tcp_keepalive_interval = 10 # Seconds between keepalive probes
-tcp_keepalive_retries = 3   # Number of failed probes before closing connection
+# HTTP configuration
+http_host = "127.0.0.1"
+http_port = 9527  # Unique port for HTTP
 
 [helix]
+# HelixDB connection settings
 endpoint = "127.0.0.1"
 port = 6969
 
 # ============================================================================
-# EMBEDDING CONFIGURATION
-# Choose where embeddings are generated: "mcp" or "helixdb"
+# EMBEDDING CONFIGURATION - Choose your mode
 # ============================================================================
 
 [embedding]
-# Mode: "mcp" = MCP server generates embeddings (more flexible)
-#       "helixdb" = HelixDB generates embeddings (simpler, uses helix.toml config)
-mode = "mcp"  # Options: "mcp" | "helixdb"
+# OPTION 1: HelixDB Mode (Recommended for most users)
+# ----------------------------------------------------
+# Uncomment below for HelixDB to handle embeddings
+mode = "helixdb"
 
-# Provider: Only used when mode = "mcp"
-# Options: "openai" | "gemini" | "local" | "tcp"
-# 
-# QUICK SWITCH BETWEEN LOCAL AND CLOUD:
-# - For cloud (OpenAI, Novita, etc.): provider = "openai"
-# - For local HTTP API (Ollama, etc.): provider = "local"
-# - For local TCP server:              provider = "tcp" (fastest!)
-# - For Gemini cloud:                  provider = "gemini"
-provider = "tcp"  # ← CHANGE THIS: "openai" for cloud, "local" for HTTP, "tcp" for TCP
+# Additional steps for helixdb mode:
+# 1. Edit your helix.toml and add: embedding_model = "text-embedding-ada-002"
+# 2. Set environment variable: $env:OPENAI_API_KEY = "sk-..."
+# 3. Update queries to use Embed(text_description)
+# 4. Restart HelixDB with: helix deploy
 
-# Model: Only used when mode = "mcp" (except for "local")
-# OpenAI/Compatible APIs: "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"
-# Novita AI: "baai/bge-m3", "BAAI/bge-large-en-v1.5"
-# Together AI: "togethercomputer/m2-bert-80M-8k-retrieval"
-# Gemini: "text-embedding-004", "embedding-001"
-# Local: Not used (local server handles model selection)
-model = "text-embedding-3-small"
 
-# API Endpoints: Only used when mode = "mcp"
-# OpenAI Official
-openai_api_url = "https://api.openai.com/v1/embeddings"
+# OPTION 2: MCP Mode (Advanced - Currently TODO)
+# -----------------------------------------------
+# Uncomment below for MCP server to handle embeddings
+# mode = "mcp"
+# provider = "openai"  # Options: "openai", "gemini", "local"
+# model = "text-embedding-3-small"
+# api_key = ""  # Leave empty to use OPENAI_API_KEY env variable
+# dimensions = 1536
 
-# Or use Novita AI (OpenAI-compatible)
-# openai_api_url = "https://api.novita.ai/openai/v1/embeddings"
+# Note: MCP mode requires implementation of embedding generation in Rust
+# For now, use helixdb mode which is fully functional
 
-# Or use Together AI (OpenAI-compatible)
-# openai_api_url = "https://api.together.xyz/v1/embeddings"
-
-# Or use OpenRouter (OpenAI-compatible)
-# openai_api_url = "https://openrouter.ai/api/v1/embeddings"
-
-# Or use Gemini via OpenAI-compatible proxy
-# openai_api_url = "https://generativelanguage.googleapis.com/v1beta/openai/embeddings"
-
-# Gemini native API (deprecated - use OpenAI-compatible instead)
-gemini_api_url = "https://generativelanguage.googleapis.com/v1beta/models"
-
-# Local embedding server - HTTP API (SIMPLE MODE)
-# Sends: {"text": "your text"}
-# Expects: [0.1, 0.2, ...] or {"embedding": [...]} or {"vector": [...]}
-# Examples:
-#   - Ollama: http://localhost:11434/api/embeddings (needs wrapper)
-#   - Custom Flask/FastAPI server: http://localhost:8080/embeddings
-#   - Text Embeddings Inference: http://localhost:8080/embed
-local_api_url = "http://localhost:8080/embeddings"
-
-# TCP embedding server - FAST MODE (Uses OVNT protocol)
-# Direct TCP connection to standalone EmbeddingServer
-# Much faster than HTTP - no HTTP overhead, binary protocol
-tcp_address = "127.0.0.1:8787"
-tcp_timeout_secs = 30
-
-# API Key: Only used when mode = "mcp" and provider = "openai" or "gemini"
-# Leave empty to use environment variable (OPENAI_API_KEY or GEMINI_API_KEY)
-# NOT required for local provider
-api_key = ""
-
-# Dimensions: Vector dimensions (default: 1536 for OpenAI, 768 for Gemini)
-# Only used when mode = "mcp"
-# Common values: 384, 768, 1024, 1536, 3072
-dimensions = 1536
 
 # ============================================================================
-# NOTES:
+# QUICK START GUIDE
 # ============================================================================
 # 
-# MODE: "helixdb" (Recommended - Simpler Setup)
-# ------------------------------------------------
-# - HelixDB handles embedding generation using Embed() function
-# - Configure embedding_model in helix.toml: embedding_model = "text-embedding-ada-002"
-# - Set OPENAI_API_KEY or GEMINI_API_KEY environment variable
-# - MCP server just passes text to HelixDB
-# - All queries use same embedding model (consistent)
+# 1. Copy this file to mcpconfig.toml
+# 2. Keep mode = "helixdb" (already set above)
+# 3. Add to your helix.toml: embedding_model = "text-embedding-ada-002"
+# 4. Set API key: $env:OPENAI_API_KEY = "sk-proj-..."
+# 5. Start the server
 # 
-# Pros:
-#   ✅ Simpler MCP server code
-#   ✅ Centralized configuration in helix.toml
-#   ✅ Automatic embedding on data insertion
-#   ✅ No external dependencies in Rust
-# 
-# Cons:
-#   ❌ Less flexible (one model for all memory types)
-#   ❌ Cannot A/B test different models easily
-#
-# ------------------------------------------------
-#
-# MODE: "mcp" (Advanced - More Control)
-# ------------------------------------------------
-# - MCP server generates embeddings via API calls
-# - Requires API key for OpenAI/Gemini providers (NOT for local)
-# - Can use different models for different memory types
-# - Uses OpenAI-compatible API format
-# 
-# Pros:
-#   ✅ Full control over embedding process
-#   ✅ Works with ANY OpenAI-compatible API
-#   ✅ Can switch providers easily
-#   ✅ Simple local mode (no complex JSON)
-# 
-# Cons:
-#   ❌ More complex code
-#   ❌ Network latency per search
-#   ❌ API costs per query (if using cloud APIs)
-#
-# ------------------------------------------------
-#
-# PROVIDER: "openai" (OpenAI-Compatible APIs)
-# ------------------------------------------------
-# Works with:
-#   ✅ OpenAI Official API
-#   ✅ Novita AI (baai/bge-m3, etc.)
-#   ✅ Together AI
-#   ✅ OpenRouter
-#   ✅ Any OpenAI-compatible service
-#
-# Request: POST to openai_api_url
-#   {"model": "...", "input": "text", "encoding_format": "float"}
-# Response: 
-#   {"data": [{"embedding": [0.1, 0.2, ...]}]}
-#
-# ------------------------------------------------
-#
-# PROVIDER: "gemini" (Now OpenAI-Compatible)
-# ------------------------------------------------
-# Use openai_api_url with Gemini's OpenAI-compatible endpoint
-# Set to: https://generativelanguage.googleapis.com/v1beta/openai/embeddings
-# Uses same format as OpenAI provider
-#
-# ------------------------------------------------
-#
-# PROVIDER: "local" (Simple Local HTTP Embedding)
-# ------------------------------------------------
-# Perfect for: Ollama, local models, custom HTTP servers
-# 
-# Request: POST to local_api_url
-#   {"text": "your text to embed"}
-#
-# ------------------------------------------------
-#
-# PROVIDER: "tcp" (High-Performance TCP Embedding)
-# ------------------------------------------------
-# Perfect for: Standalone EmbeddingServer (fastest option!)
-# 
-# Uses OVNT binary protocol over TCP
-# Benefits:
-#   ✅ 10x faster than HTTP (no HTTP overhead)
-#   ✅ Binary MessagePack serialization
-#   ✅ Direct TCP socket connection
-#   ✅ Lower latency (~50-90ms vs 100-200ms)
-# 
-# Connect to: tcp_address (default: 127.0.0.1:8787)
-# Timeout: tcp_timeout_secs (default: 30)
-# 
-# Response (any of these formats work):
-#   [0.1, 0.2, 0.3, ...]                    ← Direct array (simplest)
-#   {"embedding": [0.1, 0.2, ...]}          ← Wrapped
-#   {"vector": [0.1, 0.2, ...]}             ← Alternative
-#
-# Example local server (Python Flask):
-#   @app.route('/embeddings', methods=['POST'])
-#   def embed():
-#       text = request.json['text']
-#       vector = model.encode(text).tolist()
-#       return jsonify(vector)  # Direct array
-#
-# No API key needed!
-#
+# That's it! Semantic search will work automatically.
 # ============================================================================

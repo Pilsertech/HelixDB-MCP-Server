@@ -896,7 +896,7 @@ impl HelixMcpServer {
             };
 
             // Build payload with query_text and k (limit)
-            let mut payload = json!({
+            let payload = json!({
                 "query_text": query,
                 "k": limit
             });
@@ -2915,8 +2915,7 @@ impl ServerHandler for HelixMcpServer {
                 SEARCH STRATEGY: Use search_bm25 for exact terms/IDs/numbers, search_semantic for concepts.\n\n\
                 CORE TOOLS:\n\
                 • query_business_memory / query_customer_memory - Filter by criteria\n\
-                • search_semantic - Find by meaning (concepts, similar ideas)\n\
-                • search_bm25 - Find by keywords (exact matches, IDs, phone numbers)\n\
+                • search_semantic - Find keywords (exact matches, IDs, phone numbers)\n\
                 • create_business_memory / create_customer_memory - Add new memories\n\
                 • update_business_memory / update_customer_memory - Modify existing\n\
                 • delete_memory - Remove memories\n\n\
@@ -2939,6 +2938,7 @@ impl ServerHandler for HelixMcpServer {
     }
 
     async fn list_resources(
+        
         &self,
         _request: Option<rmcp::model::PaginatedRequestParam>,
         _context: rmcp::service::RequestContext<rmcp::RoleServer>,
@@ -3246,14 +3246,63 @@ async fn async_main() -> Result<()> {
 
     let server = HelixMcpServer::new(helix_client, Arc::new(config.clone()));
     
-    // Start server based on transport mode from config
-    if config.server.transport == "tcp" {
+    // Check which transports are enabled
+    let tcp_enabled = config.server.enable_tcp;
+    let http_enabled = config.server.enable_http;
+    let stdio_mode = config.server.transport.as_str() == "stdio";
+    
+    // Handle multiple transports concurrently
+    if tcp_enabled && http_enabled {
+        info!("🔧 MCP Server ready - starting both TCP and HTTP servers");
+        
+        let tcp_addr = format!("{}:{}", config.server.tcp_host, config.server.tcp_port);
+        let http_addr = format!("{}:{}", config.server.http_host, config.server.http_port);
+        
+        info!("   TCP:  {}", tcp_addr);
+        info!("   HTTP: {}", http_addr);
+        
+        let server_tcp = server.clone();
+        let server_http = server.clone();
+        let config_tcp = Arc::new(config.server.clone());
+        let config_http = Arc::new(config.server.clone());
+        
+        // Spawn both servers concurrently
+        let tcp_handle = tokio::spawn(async move {
+            if let Err(e) = server::start_tcp_server(server_tcp, &tcp_addr, config_tcp).await {
+                error!("TCP server error: {}", e);
+            }
+        });
+        
+        let http_handle = tokio::spawn(async move {
+            if let Err(e) = server::start_http_server(server_http, &http_addr, config_http).await {
+                error!("HTTP server error: {}", e);
+            }
+        });
+        
+        // Wait for both servers (they run forever unless error)
+        tokio::try_join!(tcp_handle, http_handle)?;
+        
+    } else if tcp_enabled {
         let tcp_addr = format!("{}:{}", config.server.tcp_host, config.server.tcp_port);
         info!("🔧 MCP Server ready - starting TCP server on {}", tcp_addr);
         server::start_tcp_server(server, &tcp_addr, Arc::new(config.server)).await?;
-    } else {
+        
+    } else if http_enabled {
+        let http_addr = format!("{}:{}", config.server.http_host, config.server.http_port);
+        info!("🔧 MCP Server ready - starting HTTP server on {}", http_addr);
+        server::start_http_server(server, &http_addr, Arc::new(config.server)).await?;
+        
+    } else if stdio_mode {
         info!("🔧 MCP Server ready - using stdio transport");
         serve_server(server, stdio()).await?;
+        
+    } else {
+        error!("❌ No transport enabled!");
+        error!("   Enable at least one transport in mcpconfig.toml:");
+        error!("   - Set enable_tcp = true for TCP");
+        error!("   - Set enable_http = true for HTTP");
+        error!("   - Set transport = \"stdio\" for STDIO");
+        anyhow::bail!("No transport enabled");
     }
     
     Ok(())

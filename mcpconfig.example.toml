@@ -5,6 +5,21 @@
 name = "AI Memory Layer MCP Server"
 version = "0.1.0"
 
+# Transport mode: "stdio", "tcp", or "http"
+transport = "http"  # Changed to HTTP mode
+
+# TCP configuration (when transport = "tcp")
+tcp_host = "127.0.0.1"
+tcp_port = 8765
+tcp_nodelay = true  # Disable Nagle's algorithm for low latency
+tcp_keepalive = true  # Detect broken connections
+tcp_keepalive_idle = 60  # Seconds before probing
+tcp_keepalive_interval = 10  # Seconds between probes
+
+# HTTP configuration (when transport = "http")
+http_host = "127.0.0.1"
+http_port = 9527  # Unique port number
+
 [helix]
 # HelixDB connection settings
 endpoint = "127.0.0.1"
