@@ -2008,17 +2008,19 @@ QUERY search_direction_paths_bm25(query_text: String, k: I64) =>
 // Status: ✅ VALIDATED - Passes helix check
 
 QUERY update_business_product_memory(
-    memory_id: ID,
+    business_id: String,
+    product_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessProductMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessProductMemory>(memory_id)::Out<HasProductEmbedding>
-    DROP N<BusinessProductMemory>(memory_id)::OutE<HasProductEmbedding>
+    memory <- N<BusinessProductMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{product_id}::EQ(product_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasProductEmbedding>
+    DROP memory::OutE<HasProductEmbedding>
     vec <- AddV<BusinessProductEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasProductEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasProductEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Business Service Memory
 // Status: Ready for validation

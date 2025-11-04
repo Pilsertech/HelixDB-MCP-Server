@@ -380,6 +380,44 @@ impl HelixMcpServer {
         }
     }
 
+    // Helper function to normalize memory_type to SINGULAR (for create/update/delete operations)
+    fn normalize_memory_type(memory_type: &str) -> &str {
+        match memory_type {
+            // Plural to singular for create/update/delete operations
+            "products" => "product",
+            "services" => "service",
+            "locations" => "location",
+            "policies" => "policy",
+            "events" => "event",
+            // Plural to singular for customer operations
+            "behaviors" => "behavior",
+            "preferences" => "preference",
+            "desires" => "desire",
+            "rules" => "rule",
+            // Already singular or special cases
+            _ => memory_type
+        }
+    }
+
+    // Helper function to normalize memory_type to PLURAL (for query operations)
+    fn normalize_to_plural(memory_type: &str) -> &str {
+        match memory_type {
+            // Singular to plural for query operations
+            "product" => "products",
+            "service" => "services",
+            "location" => "locations",
+            "policy" => "policies",
+            "event" => "events",
+            // Singular to plural for customer operations
+            "behavior" => "behaviors",
+            "preference" => "preferences",
+            "desire" => "desires",
+            "rule" => "rules",
+            // Already plural or special cases
+            _ => memory_type
+        }
+    }
+
     // ========================================================================
     // HIGH-LEVEL DOMAIN-SPECIFIC TOOLS FOR AI MEMORY LAYER
     // ========================================================================
@@ -387,12 +425,15 @@ impl HelixMcpServer {
     #[tool(description = "Query business memories - unified access to products, services, locations, hours, social media, policies, and events for a specific business")]
     async fn query_business_memory(&self, params: Parameters<QueryBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let business_id = &params.0.business_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         
-        info!("query_business_memory: business_id={}, type={}", business_id, memory_type);
+        // Normalize to plural (accept both "product" and "products")
+        let memory_type = Self::normalize_to_plural(memory_type_input);
+        
+        info!("query_business_memory: business_id={}, type={} (normalized from: {})", business_id, memory_type, memory_type_input);
 
         // Determine which query to execute based on memory_type
-        let query_name = match memory_type.as_str() {
+        let query_name = match memory_type {
             "products" => "get_business_products",
             "services" => "get_business_services",
             "locations" => "get_business_locations",
@@ -490,12 +531,15 @@ impl HelixMcpServer {
     #[tool(description = "Query customer memories - unified access to behaviors, preferences, desires, rules, and feedback for a specific customer")]
     async fn query_customer_memory(&self, params: Parameters<QueryCustomerMemoryParam>) -> Result<CallToolResult, McpError> {
         let customer_id = &params.0.customer_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         
-        info!("query_customer_memory: customer_id={}, type={}", customer_id, memory_type);
+        // Normalize to plural (accept both "behavior" and "behaviors")
+        let memory_type = Self::normalize_to_plural(memory_type_input);
+        
+        info!("query_customer_memory: customer_id={}, type={} (normalized from: {})", customer_id, memory_type, memory_type_input);
 
         // Determine which query to execute based on memory_type
-        let query_name = match memory_type.as_str() {
+        let query_name = match memory_type {
             "behaviors" => "get_customer_behaviors",
             "preferences" => "get_customer_preferences",
             "desires" => "get_customer_desires",
@@ -630,10 +674,16 @@ impl HelixMcpServer {
     #[tool(description = "Semantic search across business and customer memories using AI embeddings - finds memories by meaning, not just keywords")]
     async fn search_semantic(&self, params: Parameters<SearchSemanticParam>) -> Result<CallToolResult, McpError> {
         let query = &params.0.query;
-        let memory_types = &params.0.memory_types;
+        let memory_types_input = &params.0.memory_types;
         let limit = params.0.limit.unwrap_or(10);
         
-        info!("search_semantic: query='{}', types={:?}, limit={}", query, memory_types, limit);
+        // Normalize all memory types to plural (accept both "product" and "products")
+        let memory_types: Vec<&str> = memory_types_input
+            .iter()
+            .map(|t| Self::normalize_to_plural(t.as_str()))
+            .collect();
+        
+        info!("search_semantic: query='{}', types={:?} (normalized from: {:?}), limit={}", query, memory_types, memory_types_input, limit);
 
         // Check embedding mode from config
         if self.config.is_helixdb_embedding_enabled() {
@@ -643,8 +693,8 @@ impl HelixMcpServer {
             let mut all_results = Vec::new();
             
             // Search across requested memory types
-            for memory_type in memory_types {
-                let query_name = match memory_type.as_str() {
+            for memory_type in &memory_types {
+                let query_name = match *memory_type {
                     // Business memory types
                     "products" => "search_business_products_semantic",
                     "services" => "search_business_services_semantic",
@@ -765,8 +815,8 @@ impl HelixMcpServer {
             let mut all_results = Vec::new();
             
             // Search across requested memory types using generated embedding
-            for memory_type in memory_types {
-                let query_name = match memory_type.as_str() {
+            for memory_type in &memory_types {
+                let query_name = match *memory_type {
                     // Business memory types
                     "products" => "search_business_products_hybrid",
                     "services" => "search_business_services_hybrid",
@@ -803,7 +853,7 @@ impl HelixMcpServer {
                 // Add filters based on optional parameters
                 if let Some(business_id) = &params.0.business_id {
                     // Apply business_id filter to business memory types
-                    match memory_type.as_str() {
+                    match *memory_type {
                         "products" => {
                             payload["business_id"] = json!(business_id);
                             payload["min_price"] = json!(0.0);
@@ -818,7 +868,7 @@ impl HelixMcpServer {
 
                 if let Some(customer_id) = &params.0.customer_id {
                     // Apply customer_id filter to customer memory types
-                    match memory_type.as_str() {
+                    match *memory_type {
                         "behaviors" | "preferences" | "desires" | "rules" | "feedback" 
                         | "product_interactions" | "service_interactions" => {
                             payload["customer_id"] = json!(customer_id);
@@ -861,16 +911,22 @@ impl HelixMcpServer {
     #[tool(description = "BM25 keyword search - fast text-based search across all memory types. Use for exact matches, IDs, phone numbers, or when embeddings unavailable. Always available as fallback.")]
     async fn search_bm25(&self, params: Parameters<SearchBM25Param>) -> Result<CallToolResult, McpError> {
         let query = &params.0.query;
-        let memory_types = &params.0.memory_types;
+        let memory_types_input = &params.0.memory_types;
         let limit = params.0.limit.unwrap_or(10);
 
-        info!("search_bm25: query='{}', types={:?}, limit={}", query, memory_types, limit);
+        // Normalize all memory types to plural (accept both "product" and "products")
+        let memory_types: Vec<&str> = memory_types_input
+            .iter()
+            .map(|t| Self::normalize_to_plural(t.as_str()))
+            .collect();
+
+        info!("search_bm25: query='{}', types={:?} (normalized from: {:?}), limit={}", query, memory_types, memory_types_input, limit);
 
         let mut all_results = Vec::new();
 
         // Route each memory type to its BM25 query
-        for memory_type in memory_types {
-            let query_name = match memory_type.as_str() {
+        for memory_type in &memory_types {
+            let query_name = match *memory_type {
                 "products" => "search_business_products_bm25",
                 "services" => "search_business_services_bm25",
                 "locations" => "search_business_locations_bm25",
@@ -935,7 +991,7 @@ impl HelixMcpServer {
         })))
     }
 
-    #[tool(description = "Find customer insights - discover relationships between customers and products/services (likes, dislikes, usage) with reasons")]
+    #[tool(description = "Find customer insights - discover relationships between customers and products/services. Valid relationship_type values: 'liked' (products customer likes), 'disliked' (products customer dislikes), 'used_service' (services used), 'visited_location' (locations visited), 'all' (all relationships). Returns embedded reasons for each relationship.")]
     async fn find_customer_insights(&self, params: Parameters<FindCustomerInsightsParam>) -> Result<CallToolResult, McpError> {
         let relationship_type = &params.0.relationship_type;
         
@@ -1059,20 +1115,184 @@ impl HelixMcpServer {
     // CREATE TOOLS - Add new memories
     // ========================================================================
 
-    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, or events")]
+    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, or events. REQUIRED: Always include text_description field in data - it's used for AI embedding generation and semantic search. All other optional fields will be auto-filled with schema defaults if not provided.")]
     async fn create_business_memory(&self, params: Parameters<CreateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let business_id = &params.0.business_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         let mut data = params.0.data.clone();
         
-        info!("create_business_memory: business_id={}, type={}", business_id, memory_type);
+        // Normalize memory_type (accept both "products" and "product")
+        let memory_type = Self::normalize_memory_type(memory_type_input);
+        
+        info!("create_business_memory: business_id={}, type={} (normalized from: {})", business_id, memory_type, memory_type_input);
+
+        // Add business_id to data (required in schema but provided as parameter)
+        data["business_id"] = json!(business_id);
+
+        // Add timestamps (auto-filled by MCP server, not LLM - schema has DEFAULT NOW)
+        let timestamp = chrono::Utc::now().timestamp();
+        data["created_at"] = json!(timestamp);
+        data["updated_at"] = json!(timestamp);
+
+        // Auto-fill optional fields based on schema defaults (only if not provided)
+        match memory_type {
+            "product" => {
+                // Optional string fields (DEFAULT "" in schema)
+                if !data.get("product_category").is_some() { data["product_category"] = json!(""); }
+                if !data.get("currency").is_some() { data["currency"] = json!(""); }
+                if !data.get("availability").is_some() { data["availability"] = json!(""); }
+                if !data.get("description").is_some() { data["description"] = json!(""); }
+                if !data.get("competitor_analysis").is_some() { data["competitor_analysis"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional numeric field (DEFAULT 0.0 in schema)
+                if !data.get("price").is_some() { data["price"] = json!(0.0); }
+                
+                // Optional JSON string fields (DEFAULT "{}" in schema)
+                if !data.get("specifications").is_some() { data["specifications"] = json!("{}"); }
+                if !data.get("seasonal_trends").is_some() { data["seasonal_trends"] = json!("{}"); }
+                
+                // REQUIRED array fields - auto-fill with empty arrays if not provided
+                // Schema says these are REQUIRED but can be empty arrays
+                if !data.get("features").is_some() { data["features"] = json!([]); }
+                if !data.get("tags").is_some() { data["tags"] = json!([]); }
+                if !data.get("seo_keywords").is_some() { data["seo_keywords"] = json!([]); }
+            },
+            "service" => {
+                // Optional string fields (DEFAULT "" in schema)
+                if !data.get("service_category").is_some() { data["service_category"] = json!(""); }
+                if !data.get("currency").is_some() { data["currency"] = json!(""); }
+                if !data.get("availability").is_some() { data["availability"] = json!(""); }
+                if !data.get("description").is_some() { data["description"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional numeric fields (DEFAULT in schema)
+                if !data.get("price").is_some() { data["price"] = json!(0.0); }
+                if !data.get("duration_minutes").is_some() { data["duration_minutes"] = json!(60); }
+                
+                // REQUIRED array fields - auto-fill with empty arrays if not provided
+                if !data.get("requirements").is_some() { data["requirements"] = json!([]); }
+                if !data.get("deliverables").is_some() { data["deliverables"] = json!([]); }
+                if !data.get("tags").is_some() { data["tags"] = json!([]); }
+            },
+            "location" => {
+                // Optional string fields (DEFAULT "" in schema)
+                if !data.get("location_name").is_some() { data["location_name"] = json!(""); }
+                if !data.get("address").is_some() { data["address"] = json!(""); }
+                if !data.get("city").is_some() { data["city"] = json!(""); }
+                if !data.get("state").is_some() { data["state"] = json!(""); }
+                if !data.get("country").is_some() { data["country"] = json!(""); }
+                if !data.get("postal_code").is_some() { data["postal_code"] = json!(""); }
+                if !data.get("location_type").is_some() { data["location_type"] = json!(""); }
+                if !data.get("parking_info").is_some() { data["parking_info"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional numeric fields (DEFAULT 0.0 in schema)
+                if !data.get("latitude").is_some() { data["latitude"] = json!(0.0); }
+                if !data.get("longitude").is_some() { data["longitude"] = json!(0.0); }
+                
+                // REQUIRED array field - auto-fill with empty array if not provided
+                if !data.get("accessibility").is_some() { data["accessibility"] = json!([]); }
+            },
+            "hours" => {
+                // Optional string fields (DEFAULT "" in schema) - ONLY business_id and hours_id are REQUIRED
+                if !data.get("schedule_type").is_some() { data["schedule_type"] = json!(""); }
+                if !data.get("monday_open").is_some() { data["monday_open"] = json!(""); }
+                if !data.get("monday_close").is_some() { data["monday_close"] = json!(""); }
+                if !data.get("tuesday_open").is_some() { data["tuesday_open"] = json!(""); }
+                if !data.get("tuesday_close").is_some() { data["tuesday_close"] = json!(""); }
+                if !data.get("wednesday_open").is_some() { data["wednesday_open"] = json!(""); }
+                if !data.get("wednesday_close").is_some() { data["wednesday_close"] = json!(""); }
+                if !data.get("thursday_open").is_some() { data["thursday_open"] = json!(""); }
+                if !data.get("thursday_close").is_some() { data["thursday_close"] = json!(""); }
+                if !data.get("friday_open").is_some() { data["friday_open"] = json!(""); }
+                if !data.get("friday_close").is_some() { data["friday_close"] = json!(""); }
+                if !data.get("saturday_open").is_some() { data["saturday_open"] = json!(""); }
+                if !data.get("saturday_close").is_some() { data["saturday_close"] = json!(""); }
+                if !data.get("sunday_open").is_some() { data["sunday_open"] = json!(""); }
+                if !data.get("sunday_close").is_some() { data["sunday_close"] = json!(""); }
+                if !data.get("timezone").is_some() { data["timezone"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional JSON field (DEFAULT "{}" in schema)
+                if !data.get("exceptions").is_some() { data["exceptions"] = json!("{}"); }
+            },
+            "social" => {
+                // Optional string fields (DEFAULT "" in schema) - REQUIRED: business_id, social_id, platform
+                if !data.get("handle").is_some() { data["handle"] = json!(""); }
+                if !data.get("profile_url").is_some() { data["profile_url"] = json!(""); }
+                if !data.get("description").is_some() { data["description"] = json!(""); }
+                if !data.get("contact_info").is_some() { data["contact_info"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional numeric fields (DEFAULT 0 in schema)
+                if !data.get("follower_count").is_some() { data["follower_count"] = json!(0); }
+                if !data.get("post_count").is_some() { data["post_count"] = json!(0); }
+                
+                // last_updated defaults to NOW but will be set by timestamp logic above
+            },
+            "policy" => {
+                // Optional string fields (DEFAULT "" in schema) - REQUIRED: business_id, policy_id, policy_name
+                if !data.get("policy_type").is_some() { data["policy_type"] = json!(""); }
+                if !data.get("content").is_some() { data["content"] = json!(""); }
+                if !data.get("version").is_some() { data["version"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional boolean (DEFAULT false in schema)
+                if !data.get("is_active").is_some() { data["is_active"] = json!(false); }
+                
+                // REQUIRED array field
+                if !data.get("tags").is_some() { data["tags"] = json!([]); }
+                
+                // effective_date defaults to NOW but will be handled separately if needed
+                if !data.get("effective_date").is_some() { 
+                    data["effective_date"] = json!(chrono::Utc::now().timestamp()); 
+                }
+            },
+            "event" => {
+                // Optional string fields (DEFAULT "" in schema) - REQUIRED: business_id, event_id, event_name
+                if !data.get("event_type").is_some() { data["event_type"] = json!(""); }
+                if !data.get("description").is_some() { data["description"] = json!(""); }
+                if !data.get("location").is_some() { data["location"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // Optional numeric field (DEFAULT 0 in schema)
+                if !data.get("capacity").is_some() { data["capacity"] = json!(0); }
+                
+                // Optional boolean (DEFAULT false in schema)
+                if !data.get("registration_required").is_some() { data["registration_required"] = json!(false); }
+                
+                // REQUIRED array field
+                if !data.get("tags").is_some() { data["tags"] = json!([]); }
+                
+                // Date fields default to NOW
+                if !data.get("start_date").is_some() { 
+                    data["start_date"] = json!(chrono::Utc::now().timestamp()); 
+                }
+                if !data.get("end_date").is_some() { 
+                    data["end_date"] = json!(chrono::Utc::now().timestamp()); 
+                }
+            },
+            _ => {
+                // Unknown type - just ensure text_description exists
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+            }
+        }
 
         // Check if embedding needs to be generated (MCP mode)
         if self.config.is_mcp_embedding_enabled() {
-            // Get text_description from data
+            // Get text_description from data (now guaranteed to exist, may be empty string)
             let text_description = data.get("text_description")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| McpError::invalid_params("Missing text_description field", None))?;
+                .unwrap_or("");
+            
+            // Only generate embedding if text_description is not empty
+            if text_description.is_empty() {
+                return Ok(CallToolResult::structured_error(json!({
+                    "error": "text_description is required for embedding generation in MCP mode",
+                    "suggestion": "Provide text_description field with descriptive content"
+                })));
+            }
 
             info!("Generating embedding for text_description...");
             
@@ -1082,7 +1302,7 @@ impl HelixMcpServer {
             // Generate embedding
             match self.generate_embedding(text_description, &api_key).await {
                 Ok(embedding) => {
-                    info!("? Generated {} dimensional embedding", embedding.len());
+                    info!("✓ Generated {} dimensional embedding", embedding.len());
                     
                     // Add embedding to data
                     data["embedding"] = json!(embedding);
@@ -1099,7 +1319,7 @@ impl HelixMcpServer {
                     data["embedding_model"] = json!(model_name);
                 }
                 Err(e) => {
-                    error!("? Failed to generate embedding: {}", e);
+                    error!("✗ Failed to generate embedding: {}", e);
                     return Ok(CallToolResult::structured_error(json!({
                         "error": format!("Failed to generate embedding: {}", e),
                         "suggestion": "Check embedding configuration and API connectivity"
@@ -1112,7 +1332,7 @@ impl HelixMcpServer {
         }
 
         // Determine which query to execute based on memory_type
-        let query_name = match memory_type.as_str() {
+        let query_name = match memory_type {
             "product" => "add_business_product_memory",
             "service" => "add_business_service_memory",
             "location" => "add_business_location_memory",
@@ -1147,13 +1367,16 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Create new customer memory - add behaviors, preferences, desires, rules, or feedback")]
+    #[tool(description = "Create new customer memory - add behaviors, preferences, desires, rules, or feedback. REQUIRED: Always include text_description field in data - it's used for AI embedding generation and semantic search. All other optional fields will be auto-filled with schema defaults if not provided.")]
     async fn create_customer_memory(&self, params: Parameters<CreateCustomerMemoryParam>) -> Result<CallToolResult, McpError> {
         let customer_id = &params.0.customer_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         let mut data = params.0.data.clone();
         
-        info!("create_customer_memory: customer_id={}, type={}", customer_id, memory_type);
+        // Normalize memory_type (accept both "behaviors" and "behavior")
+        let memory_type = Self::normalize_memory_type(memory_type_input);
+        
+        info!("create_customer_memory: customer_id={}, type={} (normalized from: {})", customer_id, memory_type, memory_type_input);
 
         // Check if embedding needs to be generated (MCP mode)
         if self.config.is_mcp_embedding_enabled() {
@@ -1198,8 +1421,72 @@ impl HelixMcpServer {
             info!("Using HelixDB embedding mode - expecting embedding in data or HelixDB will generate it");
         }
 
+        // Add customer_id to data (required by all customer memory queries)
+        data["customer_id"] = json!(customer_id);
+
+        // Auto-fill timestamps (DEFAULT NOW in schema)
+        let current_timestamp = chrono::Utc::now().timestamp();
+        if !data.get("created_at").is_some() {
+            data["created_at"] = json!(current_timestamp);
+        }
+        if !data.get("updated_at").is_some() {
+            data["updated_at"] = json!(current_timestamp);
+        }
+        if !data.get("timestamp").is_some() {
+            data["timestamp"] = json!(current_timestamp);
+        }
+
+        // Auto-fill optional fields based on memory type with schema defaults
+        match memory_type {
+            "behavior" => {
+                if !data.get("context").is_some() { data["context"] = json!(""); }
+                if !data.get("channel").is_some() { data["channel"] = json!(""); }
+                if !data.get("duration_seconds").is_some() { data["duration_seconds"] = json!(0); }
+                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+            },
+            "preference" => {
+                if !data.get("preference_category").is_some() { data["preference_category"] = json!(""); }
+                if !data.get("preference_value").is_some() { data["preference_value"] = json!(""); }
+                if !data.get("strength").is_some() { data["strength"] = json!("medium"); }
+                if !data.get("source").is_some() { data["source"] = json!(""); }
+                if !data.get("confidence_score").is_some() { data["confidence_score"] = json!(0.0); }
+                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+            },
+            "desire" => {
+                if !data.get("desire_category").is_some() { data["desire_category"] = json!(""); }
+                if !data.get("priority").is_some() { data["priority"] = json!("medium"); }
+                if !data.get("budget_range").is_some() { data["budget_range"] = json!(""); }
+                if !data.get("timeframe").is_some() { data["timeframe"] = json!(""); }
+                if !data.get("fulfillment_status").is_some() { data["fulfillment_status"] = json!(""); }
+                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+            },
+            "rule" => {
+                if !data.get("rule_category").is_some() { data["rule_category"] = json!(""); }
+                if !data.get("condition").is_some() { data["condition"] = json!(""); }
+                if !data.get("action").is_some() { data["action"] = json!(""); }
+                if !data.get("priority").is_some() { data["priority"] = json!(0); }
+                if !data.get("is_active").is_some() { data["is_active"] = json!(true); }
+                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+            },
+            "feedback" => {
+                if !data.get("feedback_type").is_some() { data["feedback_type"] = json!(""); }
+                if !data.get("feedback_category").is_some() { data["feedback_category"] = json!(""); }
+                if !data.get("sentiment").is_some() { data["sentiment"] = json!("neutral"); }
+                if !data.get("rating").is_some() { data["rating"] = json!(0); }
+                if !data.get("source").is_some() { data["source"] = json!(""); }
+                if !data.get("is_resolved").is_some() { data["is_resolved"] = json!(false); }
+                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+            },
+            _ => {}
+        }
+
         // Determine which query to execute based on memory_type
-        let query_name = match memory_type.as_str() {
+        let query_name = match memory_type {
             "behavior" => "add_customer_behavior_memory",
             "preference" => "add_customer_preference_memory",
             "desire" => "add_customer_desire_memory",
@@ -1405,13 +1692,16 @@ impl HelixMcpServer {
     #[tool(description = "Query customer interactions - get all product and/or service interactions for a customer")]
     async fn query_customer_interactions(&self, params: Parameters<QueryCustomerInteractionsParam>) -> Result<CallToolResult, McpError> {
         let customer_id = &params.0.customer_id;
-        let interaction_type = &params.0.interaction_type;
+        let interaction_type_input = &params.0.interaction_type;
         
-        info!("query_customer_interactions: customer_id={}, type={}", customer_id, interaction_type);
+        // Normalize to singular (accept both "products" and "product")
+        let interaction_type = Self::normalize_memory_type(interaction_type_input);
+        
+        info!("query_customer_interactions: customer_id={}, type={} (normalized from: {})", customer_id, interaction_type, interaction_type_input);
 
         let mut all_interactions = json!({});
 
-        match interaction_type.as_str() {
+        match interaction_type {
             "product" => {
                 // Get product interactions only
                 match self.helix_client.query(
@@ -1497,10 +1787,16 @@ impl HelixMcpServer {
     #[tool(description = "Search customer interactions semantically - find product and service interactions by meaning using AI embeddings")]
     async fn search_customer_interactions(&self, params: Parameters<SearchCustomerInteractionsParam>) -> Result<CallToolResult, McpError> {
         let query = &params.0.query;
-        let interaction_types = &params.0.interaction_types;
+        let interaction_types_input = &params.0.interaction_types;
         let limit = params.0.limit.unwrap_or(10);
         
-        info!("search_customer_interactions: query='{}', types={:?}, limit={}", query, interaction_types, limit);
+        // Normalize all interaction types to singular (accept both "products" and "product")
+        let interaction_types: Vec<&str> = interaction_types_input
+            .iter()
+            .map(|t| Self::normalize_memory_type(t.as_str()))
+            .collect();
+        
+        info!("search_customer_interactions: query='{}', types={:?} (normalized from: {:?}), limit={}", query, interaction_types, interaction_types_input, limit);
 
         // Check embedding mode
         if self.config.is_helixdb_embedding_enabled() {
@@ -1509,8 +1805,8 @@ impl HelixMcpServer {
             let mut all_results = Vec::new();
             
             // Search across requested interaction types
-            for interaction_type in interaction_types {
-                let query_name = match interaction_type.as_str() {
+            for interaction_type in &interaction_types {
+                let query_name = match *interaction_type {
                     "product" => "search_customer_product_interactions",
                     "service" => "search_customer_service_interactions",
                     _ => {
@@ -1572,8 +1868,8 @@ impl HelixMcpServer {
 
             let mut all_results = Vec::new();
             
-            for interaction_type in interaction_types {
-                let query_name = match interaction_type.as_str() {
+            for interaction_type in &interaction_types {
+                let query_name = match *interaction_type {
                     "product" => "search_customer_product_interactions",
                     "service" => "search_customer_service_interactions",
                     _ => {
@@ -1904,7 +2200,7 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Query navigation - get complete navigation data for a business including hub, waypoints, and paths with optional filtering")]
+    #[tool(description = "Query navigation - get complete navigation data for a business including hub, waypoints, and paths with optional filtering. PREFERRED: Use business_id parameter to query navigation by business (recommended). ALTERNATIVE: Use navigation_id if you already know it. Returns hub details, waypoints, and direction paths.")]
     async fn query_navigation(&self, params: Parameters<QueryNavigationParam>) -> Result<CallToolResult, McpError> {
         info!("query_navigation");
 
@@ -1919,15 +2215,44 @@ impl HelixMcpServer {
             ).await {
                 Ok(hub) => {
                     navigation_data["hub"] = hub.clone();
-                    // Extract navigation_id from hub
-                    hub.get("navigation_id")
+                    
+                    // Extract navigation_id from hub - try multiple paths as response structure may vary
+                    let nav_id = hub.get("navigation_id")
                         .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
+                        .or_else(|| {
+                            // Try nav_hub.navigation_id (nested structure)
+                            hub.get("nav_hub")
+                                .and_then(|h| h.get("navigation_id"))
+                                .and_then(|v| v.as_str())
+                        })
+                        .or_else(|| {
+                            // Try if hub is an array, get first item
+                            hub.as_array()
+                                .and_then(|arr| arr.first())
+                                .and_then(|item| item.get("navigation_id"))
+                                .and_then(|v| v.as_str())
+                        })
+                        .or_else(|| {
+                            // Try nav_hub as array
+                            hub.get("nav_hub")
+                                .and_then(|h| h.as_array())
+                                .and_then(|arr| arr.first())
+                                .and_then(|item| item.get("navigation_id"))
+                                .and_then(|v| v.as_str())
+                        })
+                        .map(|s| s.to_string());
+                    
+                    if nav_id.is_none() {
+                        error!("Could not extract navigation_id from hub response. Hub structure: {:?}", hub);
+                    }
+                    
+                    nav_id
                 }
                 Err(e) => {
                     error!("Failed to get navigation hub: {}", e);
                     return Ok(CallToolResult::structured_error(json!({
-                        "error": format!("Failed to get navigation hub: {}", e)
+                        "error": format!("Failed to get navigation hub for business_id {}: {}", business_id, e),
+                        "suggestion": "Make sure a navigation hub exists for this business_id. Use create_navigation_hub first."
                     })));
                 }
             }
@@ -1936,7 +2261,8 @@ impl HelixMcpServer {
             Some(navigation_id.clone())
         } else {
             return Ok(CallToolResult::structured_error(json!({
-                "error": "Must provide either business_id or navigation_id"
+                "error": "Must provide either business_id or navigation_id",
+                "suggestion": "Provide business_id to look up navigation by business, or navigation_id if you know it directly"
             })));
         };
 
@@ -1944,7 +2270,8 @@ impl HelixMcpServer {
             Some(id) => id,
             None => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": "Could not determine navigation_id"
+                    "error": "Could not determine navigation_id from the query response",
+                    "suggestion": "The navigation hub may not exist for this business. Use create_navigation_hub first."
                 })));
             }
         };
@@ -2132,13 +2459,16 @@ impl HelixMcpServer {
     // UPDATE TOOLS - Modify existing memories
     // ========================================================================
 
-    #[tool(description = "Update existing business memory - modify products, services, locations, hours, social media, policies, or events")]
+    #[tool(description = "Update existing business memory - modify products, services, locations, hours, social media, policies, or events. REQUIRED: Always include text_description (or composite_text or description) field in updates - it's used to regenerate AI embeddings for semantic search. Also include business_id and the entity-specific ID (product_id, service_id, etc.).")]
     async fn update_business_memory(&self, params: Parameters<UpdateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         let updates = &params.0.updates;
         
-        info!("update_business_memory: memory_id={}, type={}", memory_id, memory_type);
+        // Normalize memory_type (accept both "products" and "product")
+        let memory_type = Self::normalize_memory_type(memory_type_input);
+        
+        info!("update_business_memory: memory_id={}, type={} (normalized from: {})", memory_id, memory_type, memory_type_input);
 
         // Extract composite_text from updates (required for vector-aware update queries)
         let composite_text = updates.get("composite_text")
@@ -2150,15 +2480,23 @@ impl HelixMcpServer {
                 None
             ))?;
 
-        // Route to appropriate vector-aware update query
-        let query_name = match memory_type.as_str() {
-            "product" => "update_business_product_memory",
-            "service" => "update_business_service_memory",
-            "location" => "update_business_location_memory",
-            "hours" => "update_business_hours_memory",
-            "social" => "update_business_social_memory",
-            "policy" => "update_business_policy_memory",
-            "event" => "update_business_event_memory",
+        // Extract business_id (required for all business memory types)
+        let business_id = updates.get("business_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| McpError::invalid_request(
+                "Missing required field: business_id in updates", 
+                None
+            ))?;
+
+        // Extract entity-specific ID based on memory type
+        let (entity_id_field, query_name) = match memory_type {
+            "product" => ("product_id", "update_business_product_memory"),
+            "service" => ("service_id", "update_business_service_memory"),
+            "location" => ("location_id", "update_business_location_memory"),
+            "hours" => ("hours_id", "update_business_hours_memory"),
+            "social" => ("social_id", "update_business_social_memory"),
+            "policy" => ("policy_id", "update_business_policy_memory"),
+            "event" => ("event_id", "update_business_event_memory"),
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
                     "error": format!("Invalid memory_type: {}. Valid: product, service, location, hours, social, policy, event", memory_type)
@@ -2166,10 +2504,19 @@ impl HelixMcpServer {
             }
         };
 
+        let entity_id = updates.get(entity_id_field)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                let msg = format!("Missing required field: {} in updates", entity_id_field);
+                McpError::invalid_request(msg, None)
+            })?;
+
+        info!("Updating {} with business_id={}, {}={}", memory_type, business_id, entity_id_field, entity_id);
+
         // Generate embedding based on mode
         let new_embedding = if self.config.is_mcp_embedding_enabled() {
             // MCP Mode: Generate embedding via OpenAI/Gemini/Local/TCP
-            info!("MCP mode: Generating new embedding for {} {}", memory_type, memory_id);
+            info!("MCP mode: Generating new embedding for {} {}", memory_type, entity_id);
             let api_key = self.config.get_api_key().unwrap_or_default();
             
             match self.generate_embedding(composite_text, &api_key).await {
@@ -2182,14 +2529,15 @@ impl HelixMcpServer {
             }
         } else {
             // HelixDB Mode: Use empty vector (HelixDB will generate via Embed() function)
-            info!("HelixDB mode: Using empty embedding placeholder for {} {}", memory_type, memory_id);
+            info!("HelixDB mode: Using empty embedding placeholder for {} {}", memory_type, entity_id);
             vec![]
         };
 
         // Build payload for vector-aware update query
         let timestamp = chrono::Utc::now().timestamp();
         let payload = json!({
-            "memory_id": memory_id,
+            "business_id": business_id,
+            entity_id_field: entity_id,
             "composite_text": composite_text,
             "new_embedding": new_embedding,
             "timestamp": timestamp
@@ -2201,7 +2549,8 @@ impl HelixMcpServer {
                 Ok(CallToolResult::structured(json!({
                     "success": true,
                     "memory_type": memory_type,
-                    "memory_id": memory_id,
+                    "business_id": business_id,
+                    entity_id_field: entity_id,
                     "query_used": query_name,
                     "embedding_mode": if self.config.is_mcp_embedding_enabled() { "mcp" } else { "helixdb" },
                     "updated_at": timestamp,
@@ -2218,13 +2567,16 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Update existing customer memory - modify behaviors, preferences, desires, rules, feedback, or communication history")]
+    #[tool(description = "Update existing customer memory - modify behaviors, preferences, desires, rules, feedback, or communication history. REQUIRED: Always include text_description (or composite_text or description) field in updates - it's used to regenerate AI embeddings for semantic search.")]
     async fn update_customer_memory(&self, params: Parameters<UpdateCustomerMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         let updates = &params.0.updates;
         
-        info!("update_customer_memory: memory_id={}, type={}", memory_id, memory_type);
+        // Normalize memory_type (accept both "behaviors" and "behavior")
+        let memory_type = Self::normalize_memory_type(memory_type_input);
+        
+        info!("update_customer_memory: memory_id={}, type={} (normalized from: {})", memory_id, memory_type, memory_type_input);
 
         // Extract composite_text from updates (required for vector-aware update queries)
         let composite_text = updates.get("composite_text")
@@ -2237,7 +2589,7 @@ impl HelixMcpServer {
             ))?;
 
         // Route to appropriate vector-aware update query
-        let query_name = match memory_type.as_str() {
+        let query_name = match memory_type {
             "preference" => "update_customer_preference_memory",
             "behavior" => "update_customer_behavior_memory",
             "desire" => "update_customer_desire_memory",
@@ -2303,16 +2655,19 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Update customer interaction - modify product or service interaction details and regenerate embeddings")]
+    #[tool(description = "Update customer interaction - modify product or service interaction details and regenerate embeddings. REQUIRED: Always include composite_text field - it's used to regenerate AI embeddings for semantic search.")]
     async fn update_interaction(&self, params: Parameters<UpdateInteractionParam>) -> Result<CallToolResult, McpError> {
         let interaction_id = &params.0.interaction_id;
-        let interaction_type = &params.0.interaction_type;
+        let interaction_type_input = &params.0.interaction_type;
         let composite_text = &params.0.composite_text;
         
-        info!("update_interaction: interaction_id={}, type={}", interaction_id, interaction_type);
+        // Normalize to singular (accept both "products" and "product")
+        let interaction_type = Self::normalize_memory_type(interaction_type_input);
+        
+        info!("update_interaction: interaction_id={}, type={} (normalized from: {})", interaction_id, interaction_type, interaction_type_input);
 
         // Route to appropriate vector-aware update query
-        let query_name = match interaction_type.as_str() {
+        let query_name = match interaction_type {
             "product" => "update_customer_product_interaction_memory",
             "service" => "update_customer_service_interaction_memory",
             _ => {
@@ -2449,7 +2804,7 @@ impl HelixMcpServer {
     #[tool(description = "Delete memory - remove products, services, locations, behaviors, preferences, etc. Supports cascade deletes and complete entity removal")]
     async fn delete_memory(&self, params: Parameters<DeleteMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
-        let memory_type = &params.0.memory_type;
+        let memory_type_input = &params.0.memory_type;
         let delete_strategy = params.0.delete_strategy.as_ref()
             .map(|s| s.as_str())
             .unwrap_or_else(|| {
@@ -2461,13 +2816,16 @@ impl HelixMcpServer {
                 }
             });
         
-        info!("delete_memory: memory_id={}, type={}, strategy={}", memory_id, memory_type, delete_strategy);
+        // Normalize memory_type (accept both "products" and "product")
+        let memory_type = Self::normalize_memory_type(memory_type_input);
+        
+        info!("delete_memory: memory_id={}, type={} (normalized from: {}), strategy={}", memory_id, memory_type, memory_type_input, delete_strategy);
 
         // Handle cascade and complete deletion strategies
         match delete_strategy {
             "cascade" => {
                 // Delete all memories for a business or customer
-                let query_name = match memory_type.as_str() {
+                let query_name = match memory_type {
                     "business" => "delete_all_business_memories",
                     "customer" => "delete_all_customer_memories",
                     _ => {
@@ -2502,7 +2860,7 @@ impl HelixMcpServer {
             }
             "complete" => {
                 // Delete entity and all associated memories
-                let query_name = match memory_type.as_str() {
+                let query_name = match memory_type {
                     "business" => "delete_business_complete",
                     "customer" => "delete_customer_complete",
                     _ => {
@@ -2542,7 +2900,7 @@ impl HelixMcpServer {
         let with_embedding = delete_strategy == "with_embedding";
         
         // Determine which delete query to use
-        let query_name = match memory_type.as_str() {
+        let query_name = match memory_type {
             "product" => if with_embedding { "delete_product_with_embedding" } else { "delete_product" },
             "service" => if with_embedding { "delete_service_with_embedding" } else { "delete_service" },
             "location" => if with_embedding { "delete_location_with_embedding" } else { "delete_location" },
