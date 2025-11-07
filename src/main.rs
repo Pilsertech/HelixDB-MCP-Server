@@ -1516,6 +1516,8 @@ impl HelixMcpServer {
         // Auto-fill optional fields based on memory type with schema defaults
         match memory_type {
             "behavior" => {
+                if !data.get("behavior_type").is_some() { data["behavior_type"] = json!(""); }
+                if !data.get("action").is_some() { data["action"] = json!(""); }
                 if !data.get("context").is_some() { data["context"] = json!(""); }
                 if !data.get("channel").is_some() { data["channel"] = json!(""); }
                 if !data.get("duration_seconds").is_some() { data["duration_seconds"] = json!(0); }
@@ -1545,7 +1547,12 @@ impl HelixMcpServer {
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
             },
             "rule" => {
+                if !data.get("rule_type").is_some() { data["rule_type"] = json!(""); }
+                if !data.get("category").is_some() { data["category"] = json!(""); }
                 if !data.get("rule_category").is_some() { data["rule_category"] = json!(""); }
+                if !data.get("rule_description").is_some() { data["rule_description"] = json!(""); }
+                if !data.get("enforcement").is_some() { data["enforcement"] = json!(""); }
+                if !data.get("exceptions").is_some() { data["exceptions"] = json!([]); }
                 if !data.get("condition").is_some() { data["condition"] = json!(""); }
                 if !data.get("action").is_some() { data["action"] = json!(""); }
                 if !data.get("priority").is_some() { data["priority"] = json!(0); }
@@ -1554,9 +1561,13 @@ impl HelixMcpServer {
             },
             "feedback" => {
                 if !data.get("feedback_type").is_some() { data["feedback_type"] = json!(""); }
-                if !data.get("feedback_category").is_some() { data["feedback_category"] = json!(""); }
-                if !data.get("sentiment").is_some() { data["sentiment"] = json!("neutral"); }
+                if !data.get("subject").is_some() { data["subject"] = json!(""); }
                 if !data.get("rating").is_some() { data["rating"] = json!(0); }
+                if !data.get("sentiment").is_some() { data["sentiment"] = json!("neutral"); }
+                if !data.get("channel").is_some() { data["channel"] = json!(""); }
+                if !data.get("response_required").is_some() { data["response_required"] = json!(false); }
+                if !data.get("resolved").is_some() { data["resolved"] = json!(false); }
+                if !data.get("feedback_category").is_some() { data["feedback_category"] = json!(""); }
                 if !data.get("source").is_some() { data["source"] = json!(""); }
                 if !data.get("is_resolved").is_some() { data["is_resolved"] = json!(false); }
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
