@@ -11,10 +11,10 @@
 /// - tcp_keepalive: Detect broken connections automatically
 
 use anyhow::Result;
-use rmcp::{serve_server, ServerHandler};
+use rmcp::{serve_server};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tracing::{info, error, warn};
+use tracing::{info, error};
 
 use crate::{HelixMcpServer, config::ServerConfig};
 

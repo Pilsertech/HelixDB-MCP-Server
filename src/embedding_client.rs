@@ -65,6 +65,28 @@ impl EmbeddingClient {
         }
     }
 
+    /// Validate text before generating embedding
+    fn validate_text_for_embedding(&self, text: &str) -> Result<(), String> {
+        if text.trim().is_empty() {
+            return Err("Cannot generate embedding for empty text".to_string());
+        }
+        if text.len() < 3 {
+            return Err("Text too short for meaningful embedding".to_string()); 
+        }
+        Ok(())
+    }
+
+    /// Validate embedding dimensions
+    async fn validate_embedding(&self, embedding: &[f32]) -> Result<(), String> {
+        // Check vector dimensions
+        let expected_dim = 384; // Should match model output
+        if embedding.len() != expected_dim {
+            return Err(format!("Invalid embedding dimension: got {}, expected {}", 
+                             embedding.len(), expected_dim));
+        }
+        Ok(())
+    }
+
     /// Generate embedding for text using default model
     pub async fn embed_text(&self, text: &str) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
         self.embed_text_with_model(text, None).await
@@ -76,6 +98,10 @@ impl EmbeddingClient {
         text: &str,
         model: Option<String>,
     ) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        // Validate input text
+        self.validate_text_for_embedding(text)
+            .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)) as Box<dyn std::error::Error>)?;
+
         // Connect to server
         let mut stream = tokio::time::timeout(
             self.timeout,
@@ -100,7 +126,11 @@ impl EmbeddingClient {
 
         // Try to deserialize as EmbedResponse first
         if let Ok(response) = rmp_serde::from_slice::<EmbedResponse>(&response_payload) {
-            Ok(response.get_embedding().clone())
+            let embedding = response.get_embedding().clone();
+            // Validate embedding before returning
+            self.validate_embedding(&embedding).await
+                .map_err(|e| format!("Embedding validation failed: {}", e))?;
+            Ok(embedding)
         } else if let Ok(error) = rmp_serde::from_slice::<ErrorResponse>(&response_payload) {
             Err(format!("Server error: {}", error.error).into())
         } else {

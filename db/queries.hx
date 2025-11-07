@@ -92,12 +92,12 @@ QUERY add_business_product_memory(
         composite_embedding_text: text_description,
         product_name: product_name,
         category_context: product_category,
-        price_context: currency,
-        availability_context: availability,
-        feature_context: specifications,
-        brand_context: product_name,
-        customer_context: description,
-        seasonal_context: seasonal_trends,
+        price_context: text_description,      // Using text_description for all contexts
+        availability_context: text_description,
+        feature_context: text_description,
+        brand_context: text_description,
+        customer_context: text_description,
+        seasonal_context: text_description,
         specification_summary: specifications,
         use_case_context: description,
         competitor_context: competitor_analysis,
@@ -2026,97 +2026,109 @@ QUERY update_business_product_memory(
 // Status: Ready for validation
 
 QUERY update_business_service_memory(
-    memory_id: ID,
+    business_id: String,
+    service_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessServiceMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessServiceMemory>(memory_id)::Out<HasServiceEmbedding>
-    DROP N<BusinessServiceMemory>(memory_id)::OutE<HasServiceEmbedding>
+    memory <- N<BusinessServiceMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{service_id}::EQ(service_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasServiceEmbedding>
+    DROP memory::OutE<HasServiceEmbedding>
     vec <- AddV<BusinessServiceEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasServiceEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasServiceEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Business Location Memory
 // Status: Ready for validation
 
 QUERY update_business_location_memory(
-    memory_id: ID,
+    business_id: String,
+    location_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessLocationMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessLocationMemory>(memory_id)::Out<HasLocationEmbedding>
-    DROP N<BusinessLocationMemory>(memory_id)::OutE<HasLocationEmbedding>
+    memory <- N<BusinessLocationMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{location_id}::EQ(location_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasLocationEmbedding>
+    DROP memory::OutE<HasLocationEmbedding>
     vec <- AddV<BusinessLocationEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasLocationEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasLocationEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Business Hours Memory
 // Status: Ready for validation
 
 QUERY update_business_hours_memory(
-    memory_id: ID,
+    business_id: String,
+    hours_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessHoursMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessHoursMemory>(memory_id)::Out<HasHoursEmbedding>
-    DROP N<BusinessHoursMemory>(memory_id)::OutE<HasHoursEmbedding>
+    memory <- N<BusinessHoursMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{hours_id}::EQ(hours_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasHoursEmbedding>
+    DROP memory::OutE<HasHoursEmbedding>
     vec <- AddV<BusinessHoursEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasHoursEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasHoursEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Business Social Memory
 // Status: Ready for validation
 
 QUERY update_business_social_memory(
-    memory_id: ID,
+    business_id: String,
+    social_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessSocialMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessSocialMemory>(memory_id)::Out<HasSocialEmbedding>
-    DROP N<BusinessSocialMemory>(memory_id)::OutE<HasSocialEmbedding>
+    memory <- N<BusinessSocialMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{social_id}::EQ(social_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasSocialEmbedding>
+    DROP memory::OutE<HasSocialEmbedding>
     vec <- AddV<BusinessSocialEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasSocialEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasSocialEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Business Policy Memory
 // Status: Ready for validation
 
 QUERY update_business_policy_memory(
-    memory_id: ID,
+    business_id: String,
+    policy_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessPolicyMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessPolicyMemory>(memory_id)::Out<HasPolicyEmbedding>
-    DROP N<BusinessPolicyMemory>(memory_id)::OutE<HasPolicyEmbedding>
+    memory <- N<BusinessPolicyMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{policy_id}::EQ(policy_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasPolicyEmbedding>
+    DROP memory::OutE<HasPolicyEmbedding>
     vec <- AddV<BusinessPolicyEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasPolicyEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasPolicyEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Business Event Memory
 // Status: Ready for validation
 
 QUERY update_business_event_memory(
-    memory_id: ID,
+    business_id: String,
+    event_id: String,
     composite_text: String,
     new_embedding: [F64],
     timestamp: I64
 ) =>
-    memory <- N<BusinessEventMemory>(memory_id)::UPDATE({text_description: composite_text})
-    DROP N<BusinessEventMemory>(memory_id)::Out<HasEventEmbedding>
-    DROP N<BusinessEventMemory>(memory_id)::OutE<HasEventEmbedding>
+    memory <- N<BusinessEventMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{event_id}::EQ(event_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasEventEmbedding>
+    DROP memory::OutE<HasEventEmbedding>
     vec <- AddV<BusinessEventEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasEventEmbedding>({created_at: timestamp})::From(memory)::To(vec)
-    RETURN memory
+    edge <- AddE<HasEventEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Customer Preference Memory
 // Status: Ready for validation
