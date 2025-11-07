@@ -2559,7 +2559,7 @@ impl HelixMcpServer {
     // UPDATE TOOLS - Modify existing memories
     // ========================================================================
 
-    #[tool(description = "Update existing business memory - modify products, services, locations, hours, social media, policies, or events. REQUIRED: Always include text_description (or composite_text or description) field in updates - it's used to regenerate AI embeddings for semantic search. Also include business_id and the entity-specific ID (product_id, service_id, etc.).")]
+    #[tool(description = "Update existing business memory (products, services, locations, hours, social media, policies, events). REQUIRED: memory_id (internal UUID from database node), memory_type, updates dict with: business_id, entity-specific ID (e.g., product_id from query), text_description for embedding regeneration. Get internal ID using query_business_memory.")]
     async fn update_business_memory(&self, params: Parameters<UpdateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type_input = &params.0.memory_type;
@@ -2569,6 +2569,9 @@ impl HelixMcpServer {
         let memory_type = Self::normalize_memory_type(memory_type_input);
         
         info!("update_business_memory: memory_id={}, type={} (normalized from: {})", memory_id, memory_type, memory_type_input);
+
+        // Note: If product doesn't exist, query_business_memory returns empty array, so no special error handling needed here
+        // The update query will fail naturally if memory_id doesn't exist
 
         // Extract composite_text from updates (required for vector-aware update queries)
         let composite_text = updates.get("composite_text")
@@ -2667,7 +2670,7 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Update existing customer memory - modify behaviors, preferences, desires, rules, feedback, or communication history. REQUIRED: Always include text_description (or composite_text or description) field in updates - it's used to regenerate AI embeddings for semantic search.")]
+    #[tool(description = "Update existing customer memory (behaviors, preferences, desires, rules, feedback, communication). REQUIRED: memory_id (internal UUID from database node), memory_type, updates dict with text_description for embedding regeneration. Get internal ID using query_customer_memory.")]
     async fn update_customer_memory(&self, params: Parameters<UpdateCustomerMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type_input = &params.0.memory_type;
@@ -2755,7 +2758,7 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Update customer interaction - modify product or service interaction details and regenerate embeddings. REQUIRED: Always include composite_text field - it's used to regenerate AI embeddings for semantic search.")]
+    #[tool(description = "Update customer interaction (product or service). REQUIRED: interaction_id (internal UUID from database node), interaction_type, composite_text for embedding regeneration. Get internal ID using query_customer_interactions.")]
     async fn update_interaction(&self, params: Parameters<UpdateInteractionParam>) -> Result<CallToolResult, McpError> {
         let interaction_id = &params.0.interaction_id;
         let interaction_type_input = &params.0.interaction_type;
@@ -2827,7 +2830,7 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Update navigation memory - modify navigation hub, waypoint, or direction path and regenerate embeddings")]
+    #[tool(description = "Update navigation memory (hub, waypoint, path). REQUIRED: memory_id (internal UUID from database node), navigation_type, composite_text for embedding regeneration. Get internal ID using query_navigation.")]
     async fn update_navigation(&self, params: Parameters<UpdateNavigationParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let navigation_type = &params.0.navigation_type;
@@ -2901,7 +2904,7 @@ impl HelixMcpServer {
     // DELETE TOOLS - Remove memories
     // ========================================================================
 
-    #[tool(description = "Delete memory - remove products, services, locations, behaviors, preferences, etc. Supports cascade deletes and complete entity removal")]
+    #[tool(description = "Delete memory (products, services, locations, hours, social, policy, event, behaviors, preferences, desires, rules, feedback, business, customer). REQUIRED: memory_id (internal UUID from database node), memory_type. Get internal ID using appropriate query tool (query_business_memory, query_customer_memory, etc.).")]
     async fn delete_memory(&self, params: Parameters<DeleteMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type_input = &params.0.memory_type;
