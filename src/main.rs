@@ -1112,7 +1112,7 @@ impl HelixMcpServer {
     // CREATE TOOLS - Add new memories
     // ========================================================================
 
-    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, or events. REQUIRED: Always include text_description field in data - it's used for AI embedding generation and semantic search. All other optional fields will be auto-filled with schema defaults if not provided.")]
+    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, or events. REQUIRED: text_description, and depending on memory_type - product_name (products), service_name (services), location_name (locations), policy_name (policies), event_name (events), platform (social). All other fields will be auto-filled with schema defaults if not provided.")]
     async fn create_business_memory(&self, params: Parameters<CreateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let business_id = &params.0.business_id;
         let memory_type_input = &params.0.memory_type;
@@ -1122,6 +1122,56 @@ impl HelixMcpServer {
         let memory_type = Self::normalize_memory_type(memory_type_input);
         
         info!("create_business_memory: business_id={}, type={} (normalized from: {})", business_id, memory_type, memory_type_input);
+
+        // Validate required fields based on memory_type
+        match memory_type {
+            "product" => {
+                if data.get("product_name").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "product_name is required for product memory type"
+                    })));
+                }
+            },
+            "service" => {
+                if data.get("service_name").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "service_name is required for service memory type"
+                    })));
+                }
+            },
+            "location" => {
+                if data.get("location_name").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "location_name is required for location memory type"
+                    })));
+                }
+            },
+            "policy" => {
+                if data.get("policy_name").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "policy_name is required for policy memory type"
+                    })));
+                }
+            },
+            "event" => {
+                if data.get("event_name").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "event_name is required for event memory type"
+                    })));
+                }
+            },
+            "social" => {
+                if data.get("platform").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "platform is required for social memory type"
+                    })));
+                }
+            },
+            "hours" => {
+                // No specific name field required for hours
+            },
+            _ => {}
+        }
 
         // Add business_id to data (required in schema but provided as parameter)
         data["business_id"] = json!(business_id);
