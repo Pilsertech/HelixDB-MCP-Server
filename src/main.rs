@@ -1,4 +1,4 @@
-﻿use anyhow::Result;
+use anyhow::Result;
 use rmcp::{tool_router, tool, tool_handler, ServerHandler, serve_server, schemars, transport::stdio};
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{info, error, warn};
+use uuid::Uuid;
 
 mod helix_client;
 mod session;
@@ -142,7 +143,8 @@ struct FindCustomerInsightsParam {
 struct CreateCustomerProductInteractionParam {
     customer_id: String,
     product_id: String,
-    interaction_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interaction_id: Option<String>,
     interaction_type: String,  // "liked", "disliked", "purchased", "viewed", "favorited", "reviewed"
     #[serde(skip_serializing_if = "Option::is_none")]
     rating: Option<i32>,  // Rating if applicable (1-5 scale)
@@ -165,7 +167,8 @@ struct CreateCustomerProductInteractionParam {
 struct CreateCustomerServiceInteractionParam {
     customer_id: String,
     service_id: String,
-    interaction_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interaction_id: Option<String>,
     interaction_type: String,  // "booked", "completed", "reviewed", "canceled"
     #[serde(skip_serializing_if = "Option::is_none")]
     satisfaction_rating: Option<i32>,  // Rating (1-5 scale)
@@ -261,7 +264,8 @@ struct CreateNavigationHubParam {
 
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 struct CreateNavigationWaypointParam {
-    waypoint_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    waypoint_id: Option<String>,
     navigation_id: String,
     waypoint_name: String,
     waypoint_type: String,  // "landmark", "turn", "intersection", "building", "sign"
@@ -300,7 +304,8 @@ struct CreateNavigationWaypointParam {
 
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 struct CreateDirectionPathParam {
-    path_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path_id: Option<String>,
     navigation_id: String,
     path_name: String,
     path_type: String,  // "primary", "alternative", "accessible", "emergency"
@@ -1523,21 +1528,24 @@ impl HelixMcpServer {
     // CUSTOMER INTERACTION TOOLS - Track detailed customer interactions
     // ========================================================================
 
-    #[tool(description = "Create customer product interaction - track detailed customer-product interactions with reasons (likes, dislikes, purchases, views, reviews)")]
+    #[tool(description = "Create customer product interaction - track detailed customer-product interactions with reasons (likes, dislikes, purchases, views, reviews). Use query_business_memory to get product_id.")]
     async fn create_customer_product_interaction(&self, params: Parameters<CreateCustomerProductInteractionParam>) -> Result<CallToolResult, McpError> {
         let customer_id = &params.0.customer_id;
         let product_id = &params.0.product_id;
         let interaction_type = &params.0.interaction_type;
         let text_reason = &params.0.text_reason;
         
-        info!("create_customer_product_interaction: customer_id={}, product_id={}, type={}", customer_id, product_id, interaction_type);
+        // Auto-generate interaction_id if not provided
+        let interaction_id = params.0.interaction_id.unwrap_or_else(|| format!("INT_{}", Uuid::new_v4().to_string()));
+        
+        info!("create_customer_product_interaction: customer_id={}, product_id={}, interaction_id={}, type={}", customer_id, product_id, interaction_id, interaction_type);
 
         // Build the data payload with all fields
         let timestamp = chrono::Utc::now().timestamp();
         let mut data = json!({
             "customer_id": customer_id,
             "product_id": product_id,
-            "interaction_id": params.0.interaction_id,
+            "interaction_id": interaction_id,
             "interaction_type": interaction_type,
             "rating": params.0.rating.unwrap_or(0),
             "timestamp": timestamp,
@@ -1607,21 +1615,24 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Create customer service interaction - track detailed customer-service interactions with feedback (bookings, completions, reviews, cancellations)")]
+    #[tool(description = "Create customer service interaction - track detailed customer-service interactions with feedback (bookings, completions, reviews, cancellations). Use query_business_memory to get service_id.")]
     async fn create_customer_service_interaction(&self, params: Parameters<CreateCustomerServiceInteractionParam>) -> Result<CallToolResult, McpError> {
         let customer_id = &params.0.customer_id;
         let service_id = &params.0.service_id;
         let interaction_type = &params.0.interaction_type;
         let text_feedback = &params.0.text_feedback;
         
-        info!("create_customer_service_interaction: customer_id={}, service_id={}, type={}", customer_id, service_id, interaction_type);
+        // Auto-generate interaction_id if not provided
+        let interaction_id = params.0.interaction_id.unwrap_or_else(|| format!("INT_{}", Uuid::new_v4().to_string()));
+        
+        info!("create_customer_service_interaction: customer_id={}, service_id={}, interaction_id={}, type={}", customer_id, service_id, interaction_id, interaction_type);
 
         // Build the data payload with all fields
         let timestamp = chrono::Utc::now().timestamp();
         let mut data = json!({
             "customer_id": customer_id,
             "service_id": service_id,
-            "interaction_id": params.0.interaction_id,
+            "interaction_id": interaction_id,
             "interaction_type": interaction_type,
             "satisfaction_rating": params.0.satisfaction_rating.unwrap_or(3),
             "timestamp": timestamp,
@@ -2020,11 +2031,13 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Create navigation waypoint - add landmarks, reference points, and visual cues with compass bearings for navigation")]
+    #[tool(description = "Create navigation waypoint - add landmarks, reference points, and visual cues with compass bearings for navigation. Use query_navigation to get navigation_id.")]
     async fn create_navigation_waypoint(&self, params: Parameters<CreateNavigationWaypointParam>) -> Result<CallToolResult, McpError> {
-        let waypoint_id = &params.0.waypoint_id;
         let navigation_id = &params.0.navigation_id;
         let description = &params.0.description;
+        
+        // Auto-generate waypoint_id if not provided
+        let waypoint_id = params.0.waypoint_id.unwrap_or_else(|| format!("WPT_{}", Uuid::new_v4().to_string()));
         
         info!("create_navigation_waypoint: waypoint_id={}, navigation_id={}", waypoint_id, navigation_id);
 
@@ -2109,11 +2122,13 @@ impl HelixMcpServer {
         }
     }
 
-    #[tool(description = "Create direction path - add step-by-step directions with compass waypoints, suitability flags, and accessibility information")]
+    #[tool(description = "Create direction path - add step-by-step directions with compass waypoints, suitability flags, and accessibility information. Use query_navigation to get navigation_id.")]
     async fn create_direction_path(&self, params: Parameters<CreateDirectionPathParam>) -> Result<CallToolResult, McpError> {
-        let path_id = &params.0.path_id;
         let navigation_id = &params.0.navigation_id;
         let step_by_step_instructions = &params.0.step_by_step_instructions;
+        
+        // Auto-generate path_id if not provided
+        let path_id = params.0.path_id.unwrap_or_else(|| format!("PTH_{}", Uuid::new_v4().to_string()));
         
         info!("create_direction_path: path_id={}, navigation_id={}", path_id, navigation_id);
 

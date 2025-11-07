@@ -46,7 +46,7 @@ chrono = "0.4"
 # Configuration
 toml = "0.8"
 
-# UUID for session management
+# UUID for session management and auto-generation functionality
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # MessagePack for TCP embedding client
