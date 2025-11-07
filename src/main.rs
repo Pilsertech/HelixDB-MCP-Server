@@ -1131,6 +1131,22 @@ impl HelixMcpServer {
         data["created_at"] = json!(timestamp);
         data["updated_at"] = json!(timestamp);
 
+        // Auto-generate required IDs based on memory type
+        let id_field_name = match memory_type {
+            "product" => "product_id",
+            "service" => "service_id",
+            "location" => "location_id",
+            "hours" => "hours_id",
+            "social" => "social_id",
+            "policy" => "policy_id",
+            "event" => "event_id",
+            _ => return Ok(CallToolResult::structured_error(json!({
+                "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event", memory_type)
+            }))),
+        };
+        let generated_id = format!("{}_{}", memory_type.to_uppercase(), Uuid::new_v4().to_string());
+        data[id_field_name] = json!(generated_id);
+
         // Auto-fill optional fields based on schema defaults (only if not provided)
         match memory_type {
             "product" => {
@@ -1433,6 +1449,20 @@ impl HelixMcpServer {
             data["timestamp"] = json!(current_timestamp);
         }
 
+        // Auto-generate required IDs based on memory type
+        let id_field_name = match memory_type {
+            "behavior" => "behavior_id",
+            "preference" => "preference_id", 
+            "desire" => "desire_id",
+            "rule" => "rule_id",
+            "feedback" => "feedback_id",
+            _ => return Ok(CallToolResult::structured_error(json!({
+                "error": format!("Invalid memory_type: {}. Valid types: behavior, preference, desire, rule, feedback", memory_type)
+            }))),
+        };
+        let generated_id = format!("{}_{}", memory_type.to_uppercase(), Uuid::new_v4().to_string());
+        data[id_field_name] = json!(generated_id);
+
         // Auto-fill optional fields based on memory type with schema defaults
         match memory_type {
             "behavior" => {
@@ -1443,21 +1473,25 @@ impl HelixMcpServer {
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
             },
             "preference" => {
-                if !data.get("preference_category").is_some() { data["preference_category"] = json!(""); }
-                if !data.get("preference_value").is_some() { data["preference_value"] = json!(""); }
-                if !data.get("strength").is_some() { data["strength"] = json!("medium"); }
-                if !data.get("source").is_some() { data["source"] = json!(""); }
+                if !data.get("preference_type").is_some() { data["preference_type"] = json!(""); }
+                if !data.get("category").is_some() { data["category"] = json!(""); }
+                if !data.get("subject").is_some() { data["subject"] = json!(""); }
+                if !data.get("strength").is_some() { data["strength"] = json!(""); }
+                if !data.get("is_active").is_some() { data["is_active"] = json!(false); }
+                if !data.get("evidence_count").is_some() { data["evidence_count"] = json!(0); }
+                if !data.get("last_evidence").is_some() { data["last_evidence"] = json!(current_timestamp); }
                 if !data.get("confidence_score").is_some() { data["confidence_score"] = json!(0.0); }
-                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("source_channels").is_some() { data["source_channels"] = json!([]); }
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
             },
             "desire" => {
-                if !data.get("desire_category").is_some() { data["desire_category"] = json!(""); }
-                if !data.get("priority").is_some() { data["priority"] = json!("medium"); }
-                if !data.get("budget_range").is_some() { data["budget_range"] = json!(""); }
+                if !data.get("desire_type").is_some() { data["desire_type"] = json!(""); }
+                if !data.get("category").is_some() { data["category"] = json!(""); }
+                if !data.get("description").is_some() { data["description"] = json!(""); }
+                if !data.get("priority").is_some() { data["priority"] = json!(""); }
                 if !data.get("timeframe").is_some() { data["timeframe"] = json!(""); }
-                if !data.get("fulfillment_status").is_some() { data["fulfillment_status"] = json!(""); }
-                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
+                if !data.get("budget_range").is_some() { data["budget_range"] = json!(""); }
+                if !data.get("is_active").is_some() { data["is_active"] = json!(false); }
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
             },
             "rule" => {
@@ -1466,7 +1500,6 @@ impl HelixMcpServer {
                 if !data.get("action").is_some() { data["action"] = json!(""); }
                 if !data.get("priority").is_some() { data["priority"] = json!(0); }
                 if !data.get("is_active").is_some() { data["is_active"] = json!(true); }
-                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
             },
             "feedback" => {
@@ -1476,7 +1509,6 @@ impl HelixMcpServer {
                 if !data.get("rating").is_some() { data["rating"] = json!(0); }
                 if !data.get("source").is_some() { data["source"] = json!(""); }
                 if !data.get("is_resolved").is_some() { data["is_resolved"] = json!(false); }
-                if !data.get("metadata").is_some() { data["metadata"] = json!("{}"); }
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
             },
             _ => {}
