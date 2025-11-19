@@ -2639,6 +2639,7 @@ impl HelixMcpServer {
         // Build payload for vector-aware update query
         let timestamp = chrono::Utc::now().timestamp();
         let payload = json!({
+            "memory_id": memory_id,
             "business_id": business_id,
             entity_id_field: entity_id,
             "composite_text": composite_text,
