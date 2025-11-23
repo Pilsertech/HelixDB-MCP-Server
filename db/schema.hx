@@ -375,45 +375,127 @@ E::HasEventEmbedding {
 }
 
 // Business Information Memory Node - General information, documentation, manuals, guides
-N::BusinessInformationMemory {
-    business_id: String,          // Business identifier
-    info_id: String,             // Unique information identifier
-    info_type: String DEFAULT "", // Type: documentation, manual, guide, teaching, etc. - optional
-    title: String,               // Information title (REQUIRED)
-    content: String DEFAULT "",   // Full content - optional
-    category: String DEFAULT "",  // Category for organization - optional
-    tags: [String],              // Search tags (REQUIRED - use empty array if none)
-    created_at: I64 DEFAULT NOW, // Auto-generated timestamp
-    updated_at: I64 DEFAULT NOW, // Auto-generated timestamp
-    text_description: String DEFAULT "" // Natural language description - optional
-}
+// N::BusinessInformationMemory {
+//     business_id: String,          // Business identifier
+//     info_id: String,             // Unique information identifier
+//     info_type: String DEFAULT "", // Type: documentation, manual, guide, teaching, etc. - optional
+//     title: String,               // Information title (REQUIRED)
+//     content: String DEFAULT "",   // Full content - optional
+//     category: String DEFAULT "",  // Category for organization - optional
+//     tags: [String],              // Search tags (REQUIRED - use empty array if none)
+//     created_at: I64 DEFAULT NOW, // Auto-generated timestamp
+//     updated_at: I64 DEFAULT NOW, // Auto-generated timestamp
+//     text_description: String DEFAULT "" // Natural language description - optional
+// }
 
 // Enhanced Vector embedding for Business Information Memory
-V::BusinessInformationEmbedding {
-    composite_embedding_text: String DEFAULT "",    // Rich composite text with information content
-    title: String DEFAULT "",                      // Title for direct matching
-    type_context: String DEFAULT "",               // "documentation manual guide tutorial teaching faq"
-    category_context: String DEFAULT "",           // "product usage troubleshooting installation setup"
-    content_context: String DEFAULT "",            // "step by step instructions tips best practices"
-    audience_context: String DEFAULT "",           // "beginners experts customers employees partners"
-    format_context: String DEFAULT "",             // "text video pdf interactive checklist reference"
-    update_context: String DEFAULT "",             // "current latest outdated needs update version"
-    importance_context: String DEFAULT "",         // "critical important optional nice to know"
-    access_context: String DEFAULT "",             // "public internal customer facing employee only"
-    language_context: String DEFAULT "",           // "english spanish french technical simple"
-    embedding_model: String DEFAULT "local",       // Model used for embedding
-    embedding_date: I64 DEFAULT NOW,               // When embedding was created
-    embedding_version: String DEFAULT "1.0"        // Version for tracking updates
-}
+// V::BusinessInformationEmbedding {
+//     composite_embedding_text: String DEFAULT "",    // Rich composite text with information content
+//     title: String DEFAULT "",                      // Title for direct matching
+//     type_context: String DEFAULT "",               // "documentation manual guide tutorial teaching faq"
+//     category_context: String DEFAULT "",           // "product usage troubleshooting installation setup"
+//     content_context: String DEFAULT "",            // "step by step instructions tips best practices"
+//     audience_context: String DEFAULT "",           // "beginners experts customers employees partners"
+//     format_context: String DEFAULT "",             // "text video pdf interactive checklist reference"
+//     update_context: String DEFAULT "",             // "current latest outdated needs update version"
+//     importance_context: String DEFAULT "",         // "critical important optional nice to know"
+//     access_context: String DEFAULT "",             // "public internal customer facing employee only"
+//     language_context: String DEFAULT "",           // "english spanish french technical simple"
+//     embedding_model: String DEFAULT "local",       // Model used for embedding
+//     embedding_date: I64 DEFAULT NOW,               // When embedding was created
+//     embedding_version: String DEFAULT "1.0"        // Version for tracking updates
+// }
 
 // Link information node to its embedding vector
-E::HasInformationEmbedding {
-    From: BusinessInformationMemory,
-    To: BusinessInformationEmbedding,
-    Properties: {
-        created_at: I64
-    }
-}
+// E::HasInformationEmbedding {
+//     From: BusinessInformationMemory,
+//     To: BusinessInformationEmbedding,
+//     Properties: {
+//         created_at: I64
+//     }
+// }
+
+// Information-to-Information Relationships (Create Network of Knowledge)
+// E::RelatedInformation {
+//     From: BusinessInformationMemory,
+//     To: BusinessInformationMemory,
+//     Properties: {
+//         relationship_type: String DEFAULT "related",  // "related", "similar", "complementary"
+//         strength: I32 DEFAULT 1,                      // 1-10 relationship strength
+//         created_at: I64 DEFAULT NOW,
+//         notes: String DEFAULT ""                      // Optional relationship notes
+//     }
+// }
+
+// E::PrerequisiteFor {
+//     From: BusinessInformationMemory,  // Prerequisite document
+//     To: BusinessInformationMemory,    // Document that requires this prerequisite
+//     Properties: {
+//         created_at: I64 DEFAULT NOW,
+//         notes: String DEFAULT ""       // Why this is a prerequisite
+//     }
+// }
+
+// E::PartOfSeries {
+//     From: BusinessInformationMemory,
+//     To: BusinessInformationMemory,
+//     Properties: {
+//         series_name: String DEFAULT "",  // Name of the series
+//         order: I32 DEFAULT 0,           // Order in series (1, 2, 3...)
+//         created_at: I64 DEFAULT NOW
+//     }
+// }
+
+// E::References {
+//     From: BusinessInformationMemory,  // Document that references
+//     To: BusinessInformationMemory,    // Referenced document
+//     Properties: {
+//         reference_type: String DEFAULT "citation",  // "citation", "see_also", "further_reading"
+//         page_section: String DEFAULT "",           // Where the reference appears
+//         created_at: I64 DEFAULT NOW
+//     }
+// }
+
+// Information-to-Business Memory Relationships (Link Docs to Business Assets)
+// E::InformationAboutProduct {
+//     From: BusinessInformationMemory,
+//     To: BusinessProductMemory,
+//     Properties: {
+//         info_type: String DEFAULT "documentation",  // "manual", "guide", "specs", "faq"
+//         created_at: I64 DEFAULT NOW,
+//         notes: String DEFAULT ""
+//     }
+// }
+
+// E::InformationAboutService {
+//     From: BusinessInformationMemory,
+//     To: BusinessServiceMemory,
+//     Properties: {
+//         info_type: String DEFAULT "documentation",  // "guide", "terms", "faq", "process"
+//         created_at: I64 DEFAULT NOW,
+//         notes: String DEFAULT ""
+//     }
+// }
+
+// E::InformationForLocation {
+//     From: BusinessInformationMemory,
+//     To: BusinessLocationMemory,
+//     Properties: {
+//         info_type: String DEFAULT "guide",  // "directions", "facilities", "policies"
+//         created_at: I64 DEFAULT NOW,
+//         notes: String DEFAULT ""
+//     }
+// }
+
+// E::InformationForEvent {
+//     From: BusinessInformationMemory,
+//     To: BusinessEventMemory,
+//     Properties: {
+//         info_type: String DEFAULT "details",  // "agenda", "requirements", "faq"
+//         created_at: I64 DEFAULT NOW,
+//         notes: String DEFAULT ""
+//     }
+// }
 
 // ============================================================================
 // CUSTOMER MEMORY NODES

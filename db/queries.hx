@@ -513,52 +513,52 @@ QUERY add_business_event_memory(
     RETURN event
 
 // Add a new information memory node
-QUERY add_business_information_memory(
-    business_id: String,
-    info_id: String,
-    info_type: String,
-    title: String,
-    content: String,
-    category: String,
-    tags: [String],
-    created_at: I64,
-    updated_at: I64,
-    text_description: String,
-    embedding: [F64],
-    embedding_model: String
-) =>
-    info <- AddN<BusinessInformationMemory>({
-        business_id: business_id,
-        info_id: info_id,
-        info_type: info_type,
-        title: title,
-        content: content,
-        category: category,
-        tags: tags,
-        created_at: created_at,
-        updated_at: updated_at,
-        text_description: text_description
-    })
-    embedding_node <- AddV<BusinessInformationEmbedding>(embedding, {
-        composite_embedding_text: text_description,
-        title: title,
-        type_context: info_type,
-        category_context: category,
-        content_context: content,
-        audience_context: "general audience",
-        format_context: "text document",
-        update_context: "current information",
-        importance_context: "useful reference",
-        access_context: "available to all",
-        language_context: "english",
-        embedding_model: embedding_model,
-        embedding_date: created_at,
-        embedding_version: "1.0"
-    })
-    edge <- AddE<HasInformationEmbedding>({
-        created_at: created_at
-    })::From(info)::To(embedding_node)
-    RETURN info
+// QUERY add_business_information_memory(
+//     business_id: String,
+//     info_id: String,
+//     info_type: String,
+//     title: String,
+//     content: String,
+//     category: String,
+//     tags: [String],
+//     created_at: I64,
+//     updated_at: I64,
+//     text_description: String,
+//     embedding: [F64],
+//     embedding_model: String
+// ) =>
+//     info <- AddN<BusinessInformationMemory>({
+//         business_id: business_id,
+//         info_id: info_id,
+//         info_type: info_type,
+//         title: title,
+//         content: content,
+//         category: category,
+//         tags: tags,
+//         created_at: created_at,
+//         updated_at: updated_at,
+//         text_description: text_description
+//     })
+//     embedding_node <- AddV<BusinessInformationEmbedding>(embedding, {
+//         composite_embedding_text: text_description,
+//         title: title,
+//         type_context: info_type,
+//         category_context: category,
+//         content_context: content,
+//         audience_context: "general audience",
+//         format_context: "text document",
+//         update_context: "current information",
+//         importance_context: "useful reference",
+//         access_context: "available to all",
+//         language_context: "english",
+//         embedding_model: embedding_model,
+//         embedding_date: created_at,
+//         embedding_version: "1.0"
+//     })
+//     edge <- AddE<HasInformationEmbedding>({
+//         created_at: created_at
+//     })::From(info)::To(embedding_node)
+//     RETURN info
 
 // ============================================================================
 // CUSTOMER MEMORY QUERIES
@@ -1033,9 +1033,184 @@ QUERY get_business_events(business_id: String) =>
     RETURN events
 
 // Get business information
-QUERY get_business_information(business_id: String) =>
-    information <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
-    RETURN information
+// QUERY get_business_information(business_id: String) =>
+//     information <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
+//     RETURN information
+
+// ============================================================================
+// INFORMATION RELATIONSHIP QUERIES - Create Network of Knowledge
+// ============================================================================
+
+// Link two information documents as related
+// QUERY link_related_information(
+//     from_info_id: String,
+//     to_info_id: String,
+//     relationship_type: String,
+//     strength: I32,
+//     notes: String
+// ) =>
+//     from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
+//     to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
+//     edge <- AddE<RelatedInformation>({
+//         relationship_type: relationship_type,
+//         strength: strength,
+//         notes: notes
+//     })::From(from_info)::To(to_info)
+//     RETURN edge
+
+// Create prerequisite relationship between information documents
+// QUERY link_prerequisite_information(
+//     prerequisite_info_id: String,
+//     dependent_info_id: String,
+//     notes: String
+// ) =>
+//     prereq <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(prerequisite_info_id))
+//     dependent <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(dependent_info_id))
+//     edge <- AddE<PrerequisiteFor>({
+//         notes: notes
+//     })::From(prereq)::To(dependent)
+//     RETURN edge
+
+// Link information documents as part of a series
+// QUERY link_series_information(
+//     from_info_id: String,
+//     to_info_id: String,
+//     series_name: String,
+//     order: I32
+// ) =>
+//     from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
+//     to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
+//     edge <- AddE<PartOfSeries>({
+//         series_name: series_name,
+//         order: order
+//     })::From(from_info)::To(to_info)
+//     RETURN edge
+
+// Create reference relationship between information documents
+// QUERY link_reference_information(
+//     referencing_info_id: String,
+//     referenced_info_id: String,
+//     reference_type: String,
+//     page_section: String
+// ) =>
+//     referencing <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(referencing_info_id))
+//     referenced <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(referenced_info_id))
+//     edge <- AddE<References>({
+//         reference_type: reference_type,
+//         page_section: page_section
+//     })::From(referencing)::To(referenced)
+//     RETURN edge
+
+// Link information to product
+// QUERY link_information_to_product(
+//     info_id: String,
+//     product_id: String,
+//     info_type: String,
+//     notes: String
+// ) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     product <- N<BusinessProductMemory>::WHERE(_::{product_id}::EQ(product_id))
+//     edge <- AddE<InformationAboutProduct>({
+//         info_type: info_type,
+//         notes: notes
+//     })::From(info)::To(product)
+//     RETURN edge
+
+// Link information to service
+// QUERY link_information_to_service(
+//     info_id: String,
+//     service_id: String,
+//     info_type: String,
+//     notes: String
+// ) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     service <- N<BusinessServiceMemory>::WHERE(_::{service_id}::EQ(service_id))
+//     edge <- AddE<InformationAboutService>({
+//         info_type: info_type,
+//         notes: notes
+//     })::From(info)::To(service)
+//     RETURN edge
+
+// Link information to location
+// QUERY link_information_to_location(
+//     info_id: String,
+//     location_id: String,
+//     info_type: String,
+//     notes: String
+// ) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     location <- N<BusinessLocationMemory>::WHERE(_::{location_id}::EQ(location_id))
+//     edge <- AddE<InformationForLocation>({
+//         info_type: info_type,
+//         notes: notes
+//     })::From(info)::To(location)
+//     RETURN edge
+
+// Link information to event
+// QUERY link_information_to_event(
+//     info_id: String,
+//     event_id: String,
+//     info_type: String,
+//     notes: String
+// ) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     event <- N<BusinessEventMemory>::WHERE(_::{event_id}::EQ(event_id))
+//     edge <- AddE<InformationForEvent>({
+//         info_type: info_type,
+//         notes: notes
+//     })::From(info)::To(event)
+//     RETURN edge
+
+// Query information relationships
+// QUERY get_related_information(info_id: String) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     related <- info::Out<RelatedInformation>
+//     RETURN related
+
+// QUERY get_prerequisites_for_info(info_id: String) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     prereqs <- info::In<PrerequisiteFor>
+//     RETURN prereqs
+
+// QUERY get_dependent_information(info_id: String) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     dependents <- info::Out<PrerequisiteFor>
+//     RETURN dependents
+
+// QUERY get_series_information(series_name: String) =>
+//     series <- N<BusinessInformationMemory>::OutE<PartOfSeries>::WHERE(_::{series_name}::EQ(series_name))
+//     RETURN series
+
+// QUERY get_information_references(info_id: String) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     refs <- info::Out<References>
+//     RETURN refs
+
+// QUERY get_referenced_by_info(info_id: String) =>
+//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     refs <- info::In<References>
+//     RETURN refs
+
+// Query information linked to business assets
+// QUERY get_product_information(product_id: String) =>
+//     product <- N<BusinessProductMemory>::WHERE(_::{product_id}::EQ(product_id))
+//     info <- product::In<InformationAboutProduct>
+//     RETURN info
+
+// QUERY get_service_information(service_id: String) =>
+//     service <- N<BusinessServiceMemory>::WHERE(_::{service_id}::EQ(service_id))
+//     info <- service::In<InformationAboutService>
+//     RETURN info
+
+// QUERY get_location_information(location_id: String) =>
+//     location <- N<BusinessLocationMemory>::WHERE(_::{location_id}::EQ(location_id))
+//     info <- location::In<InformationForLocation>
+//     RETURN info
+
+// QUERY get_event_information(event_id: String) =>
+//     event <- N<BusinessEventMemory>::WHERE(_::{event_id}::EQ(event_id))
+//     info <- event::In<InformationForEvent>
+//     RETURN info
 
 // ============================================================================
 // TODO: ADD CREATE QUERIES FOR REMAINING MEMORY TYPES
@@ -1244,18 +1419,18 @@ QUERY delete_all_business_events(business_id: String) =>
 // BUSINESS INFORMATION DELETES
 // ============================================================================
 
-QUERY delete_information(info_id: String) =>
-    DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-    RETURN "Deleted information"
+// QUERY delete_information(info_id: String) =>
+//     DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     RETURN "Deleted information"
 
-QUERY delete_information_with_embedding(info_id: String) =>
-    DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))::Out<HasInformationEmbedding>
-    DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-    RETURN "Deleted information and embedding"
+// QUERY delete_information_with_embedding(info_id: String) =>
+//     DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))::Out<HasInformationEmbedding>
+//     DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+//     RETURN "Deleted information and embedding"
 
-QUERY delete_all_business_information(business_id: String) =>
-    DROP N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
-    RETURN "Deleted all information for business"
+// QUERY delete_all_business_information(business_id: String) =>
+//     DROP N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
+//     RETURN "Deleted all information for business"
 
 // ============================================================================
 // CUSTOMER BEHAVIOR DELETES
@@ -2200,20 +2375,20 @@ QUERY update_business_event_memory(
     edge <- AddE<HasEventEmbedding>({created_at: timestamp})::From(updated)::To(vec)
     RETURN updated
 
-QUERY update_business_information_memory(
-    business_id: String,
-    info_id: String,
-    composite_text: String,
-    new_embedding: [F64],
-    timestamp: I64
-) =>
-    memory <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{info_id}::EQ(info_id))
-    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
-    DROP memory::Out<HasInformationEmbedding>
-    DROP memory::OutE<HasInformationEmbedding>
-    vec <- AddV<BusinessInformationEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-    edge <- AddE<HasInformationEmbedding>({created_at: timestamp})::From(updated)::To(vec)
-    RETURN updated
+// QUERY update_business_information_memory(
+//     business_id: String,
+//     info_id: String,
+//     composite_text: String,
+//     new_embedding: [F64],
+//     timestamp: I64
+// ) =>
+//     memory <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{info_id}::EQ(info_id))
+//     updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+//     DROP memory::Out<HasInformationEmbedding>
+//     DROP memory::OutE<HasInformationEmbedding>
+//     vec <- AddV<BusinessInformationEmbedding>(new_embedding, {composite_embedding_text: composite_text})
+//     edge <- AddE<HasInformationEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+//     RETURN updated
 
 // Test File: Update Customer Preference Memory
 // Status: Ready for validation

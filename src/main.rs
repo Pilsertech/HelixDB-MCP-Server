@@ -360,6 +360,23 @@ struct SearchNavigationParam {
     limit: Option<i32>,
 }
 
+// Information Relationship Parameters
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct ManageInformationRelationshipsParam {
+    operation: String,  // "create_related", "create_prerequisite", "create_series", "create_reference", "link_to_product", "link_to_service", "link_to_location", "link_to_event", "get_related", "get_prerequisites", "get_series", "get_product_info", "get_service_info"
+    from_info_id: Option<String>,  // Source info document ID
+    to_info_id: Option<String>,    // Target info document ID
+    target_business_id: Option<String>,  // Product, service, location, or event ID
+    series_name: Option<String>,   // For series operations
+    relationship_type: Option<String>,  // "related", "similar", "complementary"
+    reference_type: Option<String>,     // "citation", "see_also", "further_reading"
+    info_type: Option<String>,          // "manual", "guide", "specs", "faq", "directions", etc.
+    page_section: Option<String>,       // For reference operations
+    strength: Option<i32>,              // 1-10 relationship strength
+    order: Option<i32>,                 // For series operations
+    notes: Option<String>,              // Additional notes
+}
+
 #[derive(Clone)]
 pub struct HelixMcpServer {
     helix_client: Arc<HelixClient>,
@@ -3086,6 +3103,225 @@ impl HelixMcpServer {
     }
 
     // ========================================================================
+    // INFORMATION RELATIONSHIP TOOLS - Create Network of Knowledge
+    // ========================================================================
+
+    #[tool(description = "Manage information relationships - create links between information documents and business assets to build a knowledge network. Supports: related_info, prerequisite, series, reference, info_to_product, info_to_service, info_to_location, info_to_event relationships.")]
+    async fn manage_information_relationships(&self, params: Parameters<ManageInformationRelationshipsParam>) -> Result<CallToolResult, McpError> {
+        let operation = &params.0.operation;
+
+        match operation.as_str() {
+            "create_related" => {
+                let payload = json!({
+                    "from_info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "to_info_id": params.0.to_info_id.as_ref().unwrap(),
+                    "relationship_type": params.0.relationship_type.as_ref().unwrap_or(&"related".to_string()),
+                    "strength": params.0.strength.unwrap_or(1),
+                    "notes": params.0.notes.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_related_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "create_related",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to create related relationship: {}", e)
+                    })))
+                }
+            },
+            "create_prerequisite" => {
+                let payload = json!({
+                    "prerequisite_info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "dependent_info_id": params.0.to_info_id.as_ref().unwrap(),
+                    "notes": params.0.notes.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_prerequisite_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "create_prerequisite",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to create prerequisite relationship: {}", e)
+                    })))
+                }
+            },
+            "create_series" => {
+                let payload = json!({
+                    "from_info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "to_info_id": params.0.to_info_id.as_ref().unwrap(),
+                    "series_name": params.0.series_name.as_ref().unwrap(),
+                    "order": params.0.order.unwrap_or(1)
+                });
+                match self.helix_client.query("link_series_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "create_series",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to create series relationship: {}", e)
+                    })))
+                }
+            },
+            "create_reference" => {
+                let payload = json!({
+                    "referencing_info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "referenced_info_id": params.0.to_info_id.as_ref().unwrap(),
+                    "reference_type": params.0.reference_type.as_ref().unwrap_or(&"citation".to_string()),
+                    "page_section": params.0.page_section.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_reference_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "create_reference",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to create reference relationship: {}", e)
+                    })))
+                }
+            },
+            "link_to_product" => {
+                let payload = json!({
+                    "info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "product_id": params.0.target_business_id.as_ref().unwrap(),
+                    "info_type": params.0.info_type.as_ref().unwrap_or(&"documentation".to_string()),
+                    "notes": params.0.notes.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_information_to_product", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "link_to_product",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to link information to product: {}", e)
+                    })))
+                }
+            },
+            "link_to_service" => {
+                let payload = json!({
+                    "info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "service_id": params.0.target_business_id.as_ref().unwrap(),
+                    "info_type": params.0.info_type.as_ref().unwrap_or(&"documentation".to_string()),
+                    "notes": params.0.notes.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_information_to_service", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "link_to_service",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to link information to service: {}", e)
+                    })))
+                }
+            },
+            "link_to_location" => {
+                let payload = json!({
+                    "info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "location_id": params.0.target_business_id.as_ref().unwrap(),
+                    "info_type": params.0.info_type.as_ref().unwrap_or(&"guide".to_string()),
+                    "notes": params.0.notes.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_information_to_location", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "link_to_location",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to link information to location: {}", e)
+                    })))
+                }
+            },
+            "link_to_event" => {
+                let payload = json!({
+                    "info_id": params.0.from_info_id.as_ref().unwrap(),
+                    "event_id": params.0.target_business_id.as_ref().unwrap(),
+                    "info_type": params.0.info_type.as_ref().unwrap_or(&"details".to_string()),
+                    "notes": params.0.notes.as_ref().unwrap_or(&"".to_string())
+                });
+                match self.helix_client.query("link_information_to_event", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "success": true,
+                        "operation": "link_to_event",
+                        "result": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to link information to event: {}", e)
+                    })))
+                }
+            },
+            "get_related" => {
+                let payload = json!({"info_id": params.0.from_info_id.as_ref().unwrap()});
+                match self.helix_client.query("get_related_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_related",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get related information: {}", e)
+                    })))
+                }
+            },
+            "get_prerequisites" => {
+                let payload = json!({"info_id": params.0.from_info_id.as_ref().unwrap()});
+                match self.helix_client.query("get_prerequisites_for_info", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_prerequisites",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get prerequisites: {}", e)
+                    })))
+                }
+            },
+            "get_series" => {
+                let payload = json!({"series_name": params.0.series_name.as_ref().unwrap()});
+                match self.helix_client.query("get_series_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_series",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get series information: {}", e)
+                    })))
+                }
+            },
+            "get_product_info" => {
+                let payload = json!({"product_id": params.0.target_business_id.as_ref().unwrap()});
+                match self.helix_client.query("get_product_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_product_info",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get product information: {}", e)
+                    })))
+                }
+            },
+            "get_service_info" => {
+                let payload = json!({"service_id": params.0.target_business_id.as_ref().unwrap()});
+                match self.helix_client.query("get_service_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_service_info",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get service information: {}", e)
+                    })))
+                }
+            },
+            _ => Ok(CallToolResult::structured_error(json!({
+                "error": format!("Invalid operation: {}. Valid operations: create_related, create_prerequisite, create_series, create_reference, link_to_product, link_to_service, link_to_location, link_to_event, get_related, get_prerequisites, get_series, get_product_info, get_service_info", operation)
+            })))
+        }
+    }
+
+    // ========================================================================
     // ADVANCED TOOL - Direct query execution (last resort)
     // ========================================================================
 
@@ -3153,7 +3389,35 @@ impl HelixMcpServer {
             "update_event_dates",
             "delete_event",
             "delete_event_with_embedding",
-            
+
+            // Business information queries
+            "add_business_information_memory",
+            "get_business_information",
+            "update_business_information_memory",
+            "delete_information",
+            "delete_information_with_embedding",
+            "delete_all_business_information",
+
+            // Information relationship queries
+            "link_related_information",
+            "link_prerequisite_information",
+            "link_series_information",
+            "link_reference_information",
+            "link_information_to_product",
+            "link_information_to_service",
+            "link_information_to_location",
+            "link_information_to_event",
+            "get_related_information",
+            "get_prerequisites_for_info",
+            "get_dependent_information",
+            "get_series_information",
+            "get_information_references",
+            "get_referenced_by_info",
+            "get_product_information",
+            "get_service_information",
+            "get_location_information",
+            "get_event_information",
+
             // Customer behavior queries
             "add_customer_behavior_memory",
             "get_customer_behaviors",
