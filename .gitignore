@@ -10,6 +10,8 @@
 !mcpconfig.example.toml
 !claude_desktop_config.example.json
 !codebase-index-8cb07e38692f31beb4c50994be9e55d039d200bb.zip
+!helix.toml
+!config.hx.json
 
 # Allow src directory and its contents
 !src/

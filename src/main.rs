@@ -419,7 +419,7 @@ impl HelixMcpServer {
     // HIGH-LEVEL DOMAIN-SPECIFIC TOOLS FOR AI MEMORY LAYER
     // ========================================================================
 
-    #[tool(description = "Query business memories - unified access to products, services, locations, hours, social media, policies, and events for a specific business")]
+    #[tool(description = "Query business memories - unified access to products, services, locations, hours, social media, policies, events, and information (documentation, manuals, guides, etc.) for a specific business")]
     async fn query_business_memory(&self, params: Parameters<QueryBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let business_id = &params.0.business_id;
         let memory_type_input = &params.0.memory_type;
@@ -438,6 +438,7 @@ impl HelixMcpServer {
             "social" => "get_business_social_media",
             "policies" => "get_business_policies",
             "events" => "get_business_events",
+            "information" => "get_business_information",
             "all" => {
                 // Return all business memory types
                 let mut all_memories = json!({});
@@ -491,12 +492,19 @@ impl HelixMcpServer {
                 ).await {
                     all_memories["events"] = events;
                 }
-                
+
+                if let Ok(information) = self.helix_client.query(
+                    "get_business_information",
+                    json!({"business_id": business_id})
+                ).await {
+                    all_memories["information"] = information;
+                }
+
                 return Ok(CallToolResult::structured(all_memories));
             }
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid types: products, services, locations, hours, social, policies, events, all", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid types: products, services, locations, hours, social, policies, events, information, all", memory_type)
                 })));
             }
         };
@@ -1112,7 +1120,7 @@ impl HelixMcpServer {
     // CREATE TOOLS - Add new memories
     // ========================================================================
 
-    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, or events. REQUIRED: text_description, and depending on memory_type - product_name (products), service_name (services), location_name (locations), policy_name (policies), event_name (events), platform (social). All other fields will be auto-filled with schema defaults if not provided.")]
+    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, events, or information. REQUIRED: text_description, and depending on memory_type - product_name (products), service_name (services), location_name (locations), policy_name (policies), event_name (events), platform (social), title (information). Use 'information' memory_type for storing documentation, manuals, guides, teachings, product usage instructions, FAQs, tutorials, or any general knowledge content. All other fields will be auto-filled with schema defaults if not provided.")]
     async fn create_business_memory(&self, params: Parameters<CreateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let business_id = &params.0.business_id;
         let memory_type_input = &params.0.memory_type;
@@ -1170,6 +1178,13 @@ impl HelixMcpServer {
             "hours" => {
                 // No specific name field required for hours
             },
+            "information" => {
+                if data.get("title").is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "title is required for information memory type"
+                    })));
+                }
+            },
             _ => {}
         }
 
@@ -1190,8 +1205,9 @@ impl HelixMcpServer {
             "social" => "social_id",
             "policy" => "policy_id",
             "event" => "event_id",
+            "information" => "info_id",
             _ => return Ok(CallToolResult::structured_error(json!({
-                "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event", memory_type)
+                "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event, information", memory_type)
             }))),
         };
         let generated_id = format!("{}_{}", memory_type.to_uppercase(), Uuid::new_v4().to_string());
@@ -1292,7 +1308,8 @@ impl HelixMcpServer {
                 if !data.get("follower_count").is_some() { data["follower_count"] = json!(0); }
                 if !data.get("post_count").is_some() { data["post_count"] = json!(0); }
                 
-                // last_updated defaults to NOW but will be set by timestamp logic above
+                // last_updated defaults to NOW
+                if !data.get("last_updated").is_some() { data["last_updated"] = json!(timestamp); }
             },
             "policy" => {
                 // Optional string fields (DEFAULT "" in schema) - REQUIRED: business_id, policy_id, policy_name
@@ -1336,6 +1353,16 @@ impl HelixMcpServer {
                     data["end_date"] = json!(chrono::Utc::now().timestamp()); 
                 }
             },
+            "information" => {
+                // Optional string fields (DEFAULT "" in schema) - REQUIRED: business_id, info_id, title
+                if !data.get("info_type").is_some() { data["info_type"] = json!(""); }
+                if !data.get("content").is_some() { data["content"] = json!(""); }
+                if !data.get("category").is_some() { data["category"] = json!(""); }
+                if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
+                
+                // REQUIRED array field
+                if !data.get("tags").is_some() { data["tags"] = json!([]); }
+            },
             _ => {
                 // Unknown type - just ensure text_description exists
                 if !data.get("text_description").is_some() { data["text_description"] = json!(""); }
@@ -1366,10 +1393,10 @@ impl HelixMcpServer {
             match self.generate_embedding(text_description, &api_key).await {
                 Ok(embedding) => {
                     info!("✓ Generated {} dimensional embedding", embedding.len());
-                    
-                    // Add embedding to data
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     // Add embedding model info
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
@@ -1403,9 +1430,10 @@ impl HelixMcpServer {
             "social" => "add_business_social_media_memory",
             "policy" => "add_business_policy_memory",
             "event" => "add_business_event_memory",
+            "information" => "add_business_information_memory",
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event, information", memory_type)
                 })));
             }
         };
@@ -1457,10 +1485,10 @@ impl HelixMcpServer {
             match self.generate_embedding(text_description, &api_key).await {
                 Ok(embedding) => {
                     info!("? Generated {} dimensional embedding", embedding.len());
-                    
-                    // Add embedding to data
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     // Add embedding model info
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
@@ -1654,9 +1682,10 @@ impl HelixMcpServer {
             match self.generate_embedding(text_reason, &api_key).await {
                 Ok(embedding) => {
                     info!("✓ Generated {} dimensional embedding", embedding.len());
-                    
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
@@ -1739,9 +1768,10 @@ impl HelixMcpServer {
             match self.generate_embedding(text_feedback, &api_key).await {
                 Ok(embedding) => {
                     info!("✓ Generated {} dimensional embedding", embedding.len());
-                    
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
@@ -2071,9 +2101,10 @@ impl HelixMcpServer {
             match self.generate_embedding(navigation_summary, &api_key).await {
                 Ok(embedding) => {
                     info!("✓ Generated {} dimensional embedding", embedding.len());
-                    
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
@@ -2162,9 +2193,10 @@ impl HelixMcpServer {
             match self.generate_embedding(description, &api_key).await {
                 Ok(embedding) => {
                     info!("✓ Generated {} dimensional embedding", embedding.len());
-                    
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
@@ -2255,9 +2287,10 @@ impl HelixMcpServer {
             match self.generate_embedding(step_by_step_instructions, &api_key).await {
                 Ok(embedding) => {
                     info!("✓ Generated {} dimensional embedding", embedding.len());
-                    
-                    data["embedding"] = json!(embedding);
-                    
+
+                    // Add embedding to data (convert f32 to f64 for HelixDB)
+                    data["embedding"] = json!(embedding.iter().map(|&x| x as f64).collect::<Vec<f64>>());
+
                     let model_name = match self.config.embedding.provider {
                         Some(config::EmbeddingProvider::OpenAI) | Some(config::EmbeddingProvider::Gemini) => {
                             self.config.embedding.model.clone().unwrap_or_else(|| "unknown".to_string())
@@ -2559,7 +2592,7 @@ impl HelixMcpServer {
     // UPDATE TOOLS - Modify existing memories
     // ========================================================================
 
-    #[tool(description = "Update existing business memory (products, services, locations, hours, social media, policies, events). REQUIRED: memory_id (internal UUID from database node), memory_type, updates dict with: business_id, entity-specific ID (e.g., product_id from query), text_description for embedding regeneration. Get internal ID using query_business_memory.")]
+    #[tool(description = "Update existing business memory (products, services, locations, hours, social media, policies, events, information such as documentation/manuals). REQUIRED: memory_id (internal UUID from database node), memory_type, updates dict with: business_id, entity-specific ID (e.g., product_id from query), text_description for embedding regeneration. Get internal ID using query_business_memory.")]
     async fn update_business_memory(&self, params: Parameters<UpdateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type_input = &params.0.memory_type;
@@ -2600,9 +2633,10 @@ impl HelixMcpServer {
             "social" => ("social_id", "update_business_social_memory"),
             "policy" => ("policy_id", "update_business_policy_memory"),
             "event" => ("event_id", "update_business_event_memory"),
+            "information" => ("info_id", "update_business_information_memory"),
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid: product, service, location, hours, social, policy, event", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid: product, service, location, hours, social, policy, event, information", memory_type)
                 })));
             }
         };
@@ -2905,7 +2939,7 @@ impl HelixMcpServer {
     // DELETE TOOLS - Remove memories
     // ========================================================================
 
-    #[tool(description = "Delete memory (products, services, locations, hours, social, policy, event, behaviors, preferences, desires, rules, feedback, business, customer). REQUIRED: memory_id (internal UUID from database node), memory_type. Get internal ID using appropriate query tool (query_business_memory, query_customer_memory, etc.).")]
+    #[tool(description = "Delete memory (products, services, locations, hours, social, policy, event, information such as documentation/manuals, behaviors, preferences, desires, rules, feedback, business, customer). REQUIRED: memory_id (internal UUID from database node), memory_type. Get internal ID using appropriate query tool (query_business_memory, query_customer_memory, etc.).")]
     async fn delete_memory(&self, params: Parameters<DeleteMemoryParam>) -> Result<CallToolResult, McpError> {
         let memory_id = &params.0.memory_id;
         let memory_type_input = &params.0.memory_type;
@@ -3012,6 +3046,7 @@ impl HelixMcpServer {
             "social" => if with_embedding { "delete_social_with_embedding" } else { "delete_social" },
             "policy" => if with_embedding { "delete_policy_with_embedding" } else { "delete_policy" },
             "event" => if with_embedding { "delete_event_with_embedding" } else { "delete_event" },
+            "information" => if with_embedding { "delete_information_with_embedding" } else { "delete_information" },
             "behavior" => if with_embedding { "delete_behavior_with_embedding" } else { "delete_behavior" },
             "preference" => if with_embedding { "delete_preference_with_embedding" } else { "delete_preference" },
             "desire" => if with_embedding { "delete_desire_with_embedding" } else { "delete_desire" },
@@ -3019,7 +3054,7 @@ impl HelixMcpServer {
             "feedback" => if with_embedding { "delete_feedback_with_embedding" } else { "delete_feedback" },
             _ => {
                 return Ok(CallToolResult::structured_error(json!({
-                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event, behavior, preference, desire, rule, feedback, business, customer", memory_type)
+                    "error": format!("Invalid memory_type: {}. Valid types: product, service, location, hours, social, policy, event, information, behavior, preference, desire, rule, feedback, business, customer", memory_type)
                 })));
             }
         };

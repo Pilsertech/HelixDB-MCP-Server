@@ -345,7 +345,7 @@ QUERY add_business_hours_memory(
     RETURN hours
 
 // Add a new social media memory node
-QUERY add_business_social_memory(
+QUERY add_business_social_media_memory(
     business_id: String,
     social_id: String,
     platform: String,
@@ -511,6 +511,54 @@ QUERY add_business_event_memory(
         created_at: created_at
     })::From(event)::To(embedding_node)
     RETURN event
+
+// Add a new information memory node
+QUERY add_business_information_memory(
+    business_id: String,
+    info_id: String,
+    info_type: String,
+    title: String,
+    content: String,
+    category: String,
+    tags: [String],
+    created_at: I64,
+    updated_at: I64,
+    text_description: String,
+    embedding: [F64],
+    embedding_model: String
+) =>
+    info <- AddN<BusinessInformationMemory>({
+        business_id: business_id,
+        info_id: info_id,
+        info_type: info_type,
+        title: title,
+        content: content,
+        category: category,
+        tags: tags,
+        created_at: created_at,
+        updated_at: updated_at,
+        text_description: text_description
+    })
+    embedding_node <- AddV<BusinessInformationEmbedding>(embedding, {
+        composite_embedding_text: text_description,
+        title: title,
+        type_context: info_type,
+        category_context: category,
+        content_context: content,
+        audience_context: "general audience",
+        format_context: "text document",
+        update_context: "current information",
+        importance_context: "useful reference",
+        access_context: "available to all",
+        language_context: "english",
+        embedding_model: embedding_model,
+        embedding_date: created_at,
+        embedding_version: "1.0"
+    })
+    edge <- AddE<HasInformationEmbedding>({
+        created_at: created_at
+    })::From(info)::To(embedding_node)
+    RETURN info
 
 // ============================================================================
 // CUSTOMER MEMORY QUERIES
@@ -984,6 +1032,11 @@ QUERY get_business_events(business_id: String) =>
     events <- N<BusinessEventMemory>::WHERE(_::{business_id}::EQ(business_id))
     RETURN events
 
+// Get business information
+QUERY get_business_information(business_id: String) =>
+    information <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
+    RETURN information
+
 // ============================================================================
 // TODO: ADD CREATE QUERIES FOR REMAINING MEMORY TYPES
 // The following CREATE queries need to be added once helix check validates them:
@@ -1186,6 +1239,23 @@ QUERY delete_event_with_embedding(event_id: String) =>
 QUERY delete_all_business_events(business_id: String) =>
     DROP N<BusinessEventMemory>::WHERE(_::{business_id}::EQ(business_id))
     RETURN "Deleted all events for business"
+
+// ============================================================================
+// BUSINESS INFORMATION DELETES
+// ============================================================================
+
+QUERY delete_information(info_id: String) =>
+    DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+    RETURN "Deleted information"
+
+QUERY delete_information_with_embedding(info_id: String) =>
+    DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))::Out<HasInformationEmbedding>
+    DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
+    RETURN "Deleted information and embedding"
+
+QUERY delete_all_business_information(business_id: String) =>
+    DROP N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
+    RETURN "Deleted all information for business"
 
 // ============================================================================
 // CUSTOMER BEHAVIOR DELETES
@@ -2128,6 +2198,21 @@ QUERY update_business_event_memory(
     DROP memory::OutE<HasEventEmbedding>
     vec <- AddV<BusinessEventEmbedding>(new_embedding, {composite_embedding_text: composite_text})
     edge <- AddE<HasEventEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
+
+QUERY update_business_information_memory(
+    business_id: String,
+    info_id: String,
+    composite_text: String,
+    new_embedding: [F64],
+    timestamp: I64
+) =>
+    memory <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{info_id}::EQ(info_id))
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasInformationEmbedding>
+    DROP memory::OutE<HasInformationEmbedding>
+    vec <- AddV<BusinessInformationEmbedding>(new_embedding, {composite_embedding_text: composite_text})
+    edge <- AddE<HasInformationEmbedding>({created_at: timestamp})::From(updated)::To(vec)
     RETURN updated
 
 // Test File: Update Customer Preference Memory

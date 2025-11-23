@@ -374,6 +374,47 @@ E::HasEventEmbedding {
     }
 }
 
+// Business Information Memory Node - General information, documentation, manuals, guides
+N::BusinessInformationMemory {
+    business_id: String,          // Business identifier
+    info_id: String,             // Unique information identifier
+    info_type: String DEFAULT "", // Type: documentation, manual, guide, teaching, etc. - optional
+    title: String,               // Information title (REQUIRED)
+    content: String DEFAULT "",   // Full content - optional
+    category: String DEFAULT "",  // Category for organization - optional
+    tags: [String],              // Search tags (REQUIRED - use empty array if none)
+    created_at: I64 DEFAULT NOW, // Auto-generated timestamp
+    updated_at: I64 DEFAULT NOW, // Auto-generated timestamp
+    text_description: String DEFAULT "" // Natural language description - optional
+}
+
+// Enhanced Vector embedding for Business Information Memory
+V::BusinessInformationEmbedding {
+    composite_embedding_text: String DEFAULT "",    // Rich composite text with information content
+    title: String DEFAULT "",                      // Title for direct matching
+    type_context: String DEFAULT "",               // "documentation manual guide tutorial teaching faq"
+    category_context: String DEFAULT "",           // "product usage troubleshooting installation setup"
+    content_context: String DEFAULT "",            // "step by step instructions tips best practices"
+    audience_context: String DEFAULT "",           // "beginners experts customers employees partners"
+    format_context: String DEFAULT "",             // "text video pdf interactive checklist reference"
+    update_context: String DEFAULT "",             // "current latest outdated needs update version"
+    importance_context: String DEFAULT "",         // "critical important optional nice to know"
+    access_context: String DEFAULT "",             // "public internal customer facing employee only"
+    language_context: String DEFAULT "",           // "english spanish french technical simple"
+    embedding_model: String DEFAULT "local",       // Model used for embedding
+    embedding_date: I64 DEFAULT NOW,               // When embedding was created
+    embedding_version: String DEFAULT "1.0"        // Version for tracking updates
+}
+
+// Link information node to its embedding vector
+E::HasInformationEmbedding {
+    From: BusinessInformationMemory,
+    To: BusinessInformationEmbedding,
+    Properties: {
+        created_at: I64
+    }
+}
+
 // ============================================================================
 // CUSTOMER MEMORY NODES
 // Customer behaviors, preferences, and memories with natural language text
