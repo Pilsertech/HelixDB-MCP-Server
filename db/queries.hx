@@ -513,52 +513,52 @@ QUERY add_business_event_memory(
     RETURN event
 
 // Add a new information memory node
-// QUERY add_business_information_memory(
-//     business_id: String,
-//     info_id: String,
-//     info_type: String,
-//     title: String,
-//     content: String,
-//     category: String,
-//     tags: [String],
-//     created_at: I64,
-//     updated_at: I64,
-//     text_description: String,
-//     embedding: [F64],
-//     embedding_model: String
-// ) =>
-//     info <- AddN<BusinessInformationMemory>({
-//         business_id: business_id,
-//         info_id: info_id,
-//         info_type: info_type,
-//         title: title,
-//         content: content,
-//         category: category,
-//         tags: tags,
-//         created_at: created_at,
-//         updated_at: updated_at,
-//         text_description: text_description
-//     })
-//     embedding_node <- AddV<BusinessInformationEmbedding>(embedding, {
-//         composite_embedding_text: text_description,
-//         title: title,
-//         type_context: info_type,
-//         category_context: category,
-//         content_context: content,
-//         audience_context: "general audience",
-//         format_context: "text document",
-//         update_context: "current information",
-//         importance_context: "useful reference",
-//         access_context: "available to all",
-//         language_context: "english",
-//         embedding_model: embedding_model,
-//         embedding_date: created_at,
-//         embedding_version: "1.0"
-//     })
-//     edge <- AddE<HasInformationEmbedding>({
-//         created_at: created_at
-//     })::From(info)::To(embedding_node)
-//     RETURN info
+QUERY add_business_information_memory(
+    business_id: String,
+    info_id: String,
+    info_type: String,
+    title: String,
+    content: String,
+    category: String,
+    tags: [String],
+    created_at: I64,
+    updated_at: I64,
+    text_description: String,
+    embedding: [F64],
+    embedding_model: String
+) =>
+    info <- AddN<BusinessInformationMemory>({
+        business_id: business_id,
+        info_id: info_id,
+        info_type: info_type,
+        title: title,
+        content: content,
+        category: category,
+        tags: tags,
+        created_at: created_at,
+        updated_at: updated_at,
+        text_description: text_description
+    })
+    embedding_node <- AddV<BusinessInformationEmbedding>(embedding, {
+        composite_embedding_text: text_description,
+        title: title,
+        type_context: info_type,
+        category_context: category,
+        content_context: content,
+        audience_context: "general audience",
+        format_context: "text document",
+        update_context: "current information",
+        importance_context: "useful reference",
+        access_context: "available to all",
+        language_context: "english",
+        embedding_model: embedding_model,
+        embedding_date: created_at,
+        embedding_version: "1.0"
+    })
+    edge <- AddE<HasInformationEmbedding>({
+        created_at: created_at
+    })::From(info)::To(embedding_node)
+    RETURN info
 
 // ============================================================================
 // CUSTOMER MEMORY QUERIES
@@ -1042,21 +1042,21 @@ QUERY get_business_events(business_id: String) =>
 // ============================================================================
 
 // Link two information documents as related
-// QUERY link_related_information(
-//     from_info_id: String,
-//     to_info_id: String,
-//     relationship_type: String,
-//     strength: I32,
-//     notes: String
-// ) =>
-//     from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
-//     to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
-//     edge <- AddE<RelatedInformation>({
-//         relationship_type: relationship_type,
-//         strength: strength,
-//         notes: notes
-//     })::From(from_info)::To(to_info)
-//     RETURN edge
+QUERY link_related_information(
+    from_info_id: String,
+    to_info_id: String,
+    relationship_type: String,
+    strength: I32,
+    notes: String
+) =>
+    from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
+    to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
+    edge <- AddE<RelatedInformation>({
+        relationship_type: relationship_type,
+        strength: strength,
+        notes: notes
+    })::From(from_info)::To(to_info)
+    RETURN edge
 
 // Create prerequisite relationship between information documents
 // QUERY link_prerequisite_information(
