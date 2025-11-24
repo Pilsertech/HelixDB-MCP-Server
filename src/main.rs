@@ -1137,7 +1137,7 @@ impl HelixMcpServer {
     // CREATE TOOLS - Add new memories
     // ========================================================================
 
-    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, events, or information. REQUIRED: text_description, and depending on memory_type - product_name (products), service_name (services), location_name (locations), policy_name (policies), event_name (events), platform (social), title (information). Use 'information' memory_type for storing documentation, manuals, guides, teachings, product usage instructions, FAQs, tutorials, or any general knowledge content. All other fields will be auto-filled with schema defaults if not provided.")]
+    #[tool(description = "Create new business memory - add products, services, locations, hours, social media, policies, events, or information. REQUIRED: business_id, memory_type, data with text_description (required for all types in MCP mode for embedding generation). Type-specific required fields in data: product_name (for product), service_name (for service), location_name (for location), policy_name (for policy), event_name (for event), platform (for social), title (for information). No additional fields required for hours. Use 'information' memory_type for storing documentation, manuals, guides, teachings, product usage instructions, FAQs, tutorials, or any general knowledge content. All other fields will be auto-filled with schema defaults if not provided.")]
     async fn create_business_memory(&self, params: Parameters<CreateBusinessMemoryParam>) -> Result<CallToolResult, McpError> {
         let business_id = &params.0.business_id;
         let memory_type_input = &params.0.memory_type;
