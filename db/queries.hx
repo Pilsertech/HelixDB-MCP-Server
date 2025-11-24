@@ -2100,6 +2100,23 @@ QUERY search_business_events_semantic(query_text: String, k: I64) =>
     events <- results::In<HasEventEmbedding>
     RETURN events
 
+// Business Information Semantic Search
+QUERY search_business_information_semantic(query_text: String, k: I64) =>
+    results <- SearchV<BusinessInformationEmbedding>(Embed(query_text), k)
+    information <- results::In<HasInformationEmbedding>
+    RETURN information
+
+// Business Information Hybrid Search
+QUERY search_business_information_hybrid(
+    query_embedding: [F64],
+    limit: I64,
+    business_id: String
+) =>
+    embeddings <- SearchV<BusinessInformationEmbedding>(query_embedding, limit)
+    information <- embeddings::In<HasInformationEmbedding>
+    filtered <- information::WHERE(_::{business_id}::EQ(business_id))
+    RETURN filtered
+
 // Customer Behaviors Semantic Search
 QUERY search_customer_behaviors_semantic(query_text: String, k: I64) =>
     results <- SearchV<CustomerBehaviorEmbedding>(Embed(query_text), k)
@@ -2203,6 +2220,11 @@ QUERY search_business_policies_bm25(query_text: String, k: I64) =>
 QUERY search_business_events_bm25(query_text: String, k: I64) =>
     events <- SearchBM25<BusinessEventMemory>(query_text, k)
     RETURN events
+
+// Business Information BM25 Search
+QUERY search_business_information_bm25(query_text: String, k: I64) =>
+    information <- SearchBM25<BusinessInformationMemory>(query_text, k)
+    RETURN information
 
 // Customer Behaviors BM25 Search
 QUERY search_customer_behaviors_bm25(query_text: String, k: I64) =>

@@ -725,6 +725,7 @@ impl HelixMcpServer {
                     "social" => "search_business_social_semantic",
                     "policies" => "search_business_policies_semantic",
                     "events" => "search_business_events_semantic",
+                    "information" => "search_business_information_semantic",
                     // Customer memory types
                     "behaviors" => "search_customer_behaviors_semantic",
                     "preferences" => "search_customer_preferences_semantic",
@@ -847,6 +848,7 @@ impl HelixMcpServer {
                     "social" => "search_business_social_hybrid",
                     "policies" => "search_business_policies_hybrid",
                     "events" => "search_business_events_hybrid",
+                    "information" => "search_business_information_hybrid",
                     // Customer memory types
                     "behaviors" => "search_customer_behaviors_hybrid",
                     "preferences" => "search_customer_preferences_hybrid",
@@ -881,7 +883,7 @@ impl HelixMcpServer {
                             payload["min_price"] = json!(0.0);
                             payload["max_price"] = json!(1000000.0);
                         }
-                        "services" | "locations" | "hours" | "social" | "policies" | "events" => {
+                        "services" | "locations" | "hours" | "social" | "policies" | "events" | "information" => {
                             payload["business_id"] = json!(business_id);
                         }
                         _ => {}
@@ -956,6 +958,7 @@ impl HelixMcpServer {
                 "social" => "search_business_social_bm25",
                 "policies" => "search_business_policies_bm25",
                 "events" => "search_business_events_bm25",
+                "information" => "search_business_information_bm25",
                 "behaviors" => "search_customer_behaviors_bm25",
                 "preferences" => "search_customer_preferences_bm25",
                 "desires" => "search_customer_desires_bm25",
