@@ -1042,124 +1042,124 @@ QUERY get_business_events(business_id: String) =>
 // ============================================================================
 
 // Link two information documents as related
-// QUERY link_related_information(
-//     from_info_id: String,
-//     to_info_id: String,
-//     relationship_type: String,
-//     strength: I32,
-//     notes: String
-// ) =>
-//     from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
-//     to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
-//     edge <- AddE<RelatedInformation>({
-//         relationship_type: relationship_type,
-//         strength: strength,
-//         notes: notes
-//     })::From(from_info)::To(to_info)
-//     RETURN edge
+QUERY link_related_information(
+    from_info_id: String,
+    to_info_id: String,
+    relationship_type: String,
+    strength: I32,
+    notes: String
+) =>
+    from_info <- N<BusinessInformationMemory>({info_id: from_info_id})
+    to_info <- N<BusinessInformationMemory>({info_id: to_info_id})
+    edge <- AddE<RelatedInformation>({
+        relationship_type: relationship_type,
+        strength: strength,
+        notes: notes
+    })::From(from_info)::To(to_info)
+    RETURN edge
 
 // Create prerequisite relationship between information documents
-// QUERY link_prerequisite_information(
-//     prerequisite_info_id: String,
-//     dependent_info_id: String,
-//     notes: String
-// ) =>
-//     prereq <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(prerequisite_info_id))
-//     dependent <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(dependent_info_id))
-//     edge <- AddE<PrerequisiteFor>({
-//         notes: notes
-//     })::From(prereq)::To(dependent)
-//     RETURN edge
+QUERY link_prerequisite_information(
+    prerequisite_info_id: String,
+    dependent_info_id: String,
+    notes: String
+) =>
+    prereq <- N<BusinessInformationMemory>({info_id: prerequisite_info_id})
+    dependent <- N<BusinessInformationMemory>({info_id: dependent_info_id})
+    edge <- AddE<PrerequisiteFor>({
+        notes: notes
+    })::From(prereq)::To(dependent)
+    RETURN edge
 
 // Link information documents as part of a series
-// QUERY link_series_information(
-//     from_info_id: String,
-//     to_info_id: String,
-//     series_name: String,
-//     order: I32
-// ) =>
-//     from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
-//     to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
-//     edge <- AddE<PartOfSeries>({
-//         series_name: series_name,
-//         order: order
-//     })::From(from_info)::To(to_info)
-//     RETURN edge
+QUERY link_series_information(
+    from_info_id: String,
+    to_info_id: String,
+    series_name: String,
+    order: I32
+) =>
+    from_info <- N<BusinessInformationMemory>({info_id: from_info_id})
+    to_info <- N<BusinessInformationMemory>({info_id: to_info_id})
+    edge <- AddE<PartOfSeries>({
+        series_name: series_name,
+        order: order
+    })::From(from_info)::To(to_info)
+    RETURN edge
 
 // Create reference relationship between information documents
-// QUERY link_reference_information(
-//     referencing_info_id: String,
-//     referenced_info_id: String,
-//     reference_type: String,
-//     page_section: String
-// ) =>
-//     referencing <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(referencing_info_id))
-//     referenced <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(referenced_info_id))
-//     edge <- AddE<References>({
-//         reference_type: reference_type,
-//         page_section: page_section
-//     })::From(referencing)::To(referenced)
-//     RETURN edge
+QUERY link_reference_information(
+    referencing_info_id: String,
+    referenced_info_id: String,
+    reference_type: String,
+    page_section: String
+) =>
+    referencing <- N<BusinessInformationMemory>({info_id: referencing_info_id})
+    referenced <- N<BusinessInformationMemory>({info_id: referenced_info_id})
+    edge <- AddE<References>({
+        reference_type: reference_type,
+        page_section: page_section
+    })::From(referencing)::To(referenced)
+    RETURN edge
 
 // Link information to product
-// QUERY link_information_to_product(
-//     info_id: String,
-//     product_id: String,
-//     info_type: String,
-//     notes: String
-// ) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     product <- N<BusinessProductMemory>::WHERE(_::{product_id}::EQ(product_id))
-//     edge <- AddE<InformationAboutProduct>({
-//         info_type: info_type,
-//         notes: notes
-//     })::From(info)::To(product)
-//     RETURN edge
+QUERY link_information_to_product(
+    info_id: String,
+    product_id: String,
+    info_type: String,
+    notes: String
+) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    product <- N<BusinessProductMemory>({product_id: product_id})
+    edge <- AddE<InformationAboutProduct>({
+        info_type: info_type,
+        notes: notes
+    })::From(info)::To(product)
+    RETURN edge
 
 // Link information to service
-// QUERY link_information_to_service(
-//     info_id: String,
-//     service_id: String,
-//     info_type: String,
-//     notes: String
-// ) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     service <- N<BusinessServiceMemory>::WHERE(_::{service_id}::EQ(service_id))
-//     edge <- AddE<InformationAboutService>({
-//         info_type: info_type,
-//         notes: notes
-//     })::From(info)::To(service)
-//     RETURN edge
+QUERY link_information_to_service(
+    info_id: String,
+    service_id: String,
+    info_type: String,
+    notes: String
+) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    service <- N<BusinessServiceMemory>({service_id: service_id})
+    edge <- AddE<InformationAboutService>({
+        info_type: info_type,
+        notes: notes
+    })::From(info)::To(service)
+    RETURN edge
 
 // Link information to location
-// QUERY link_information_to_location(
-//     info_id: String,
-//     location_id: String,
-//     info_type: String,
-//     notes: String
-// ) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     location <- N<BusinessLocationMemory>::WHERE(_::{location_id}::EQ(location_id))
-//     edge <- AddE<InformationForLocation>({
-//         info_type: info_type,
-//         notes: notes
-//     })::From(info)::To(location)
-//     RETURN edge
+QUERY link_information_to_location(
+    info_id: String,
+    location_id: String,
+    info_type: String,
+    notes: String
+) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    location <- N<BusinessLocationMemory>({location_id: location_id})
+    edge <- AddE<InformationForLocation>({
+        info_type: info_type,
+        notes: notes
+    })::From(info)::To(location)
+    RETURN edge
 
 // Link information to event
-// QUERY link_information_to_event(
-//     info_id: String,
-//     event_id: String,
-//     info_type: String,
-//     notes: String
-// ) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     event <- N<BusinessEventMemory>::WHERE(_::{event_id}::EQ(event_id))
-//     edge <- AddE<InformationForEvent>({
-//         info_type: info_type,
-//         notes: notes
-//     })::From(info)::To(event)
-//     RETURN edge
+QUERY link_information_to_event(
+    info_id: String,
+    event_id: String,
+    info_type: String,
+    notes: String
+) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    event <- N<BusinessEventMemory>({event_id: event_id})
+    edge <- AddE<InformationForEvent>({
+        info_type: info_type,
+        notes: notes
+    })::From(info)::To(event)
+    RETURN edge
 
 // Query information relationships
 // QUERY get_related_information(info_id: String) =>

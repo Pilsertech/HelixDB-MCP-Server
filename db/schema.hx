@@ -32,10 +32,10 @@ N::Customer {
 // Each business aspect (products, services, location, etc.) gets its own node
 // ============================================================================
 
-// Product Memory Node - Each product is a separate memory node  
+// Product Memory Node - Each product is a separate memory node
 N::BusinessProductMemory {
     business_id: String,                    // Business identifier (REQUIRED)
-    product_id: String,                     // Unique product identifier (REQUIRED)
+    INDEX product_id: String,               // Unique product identifier (REQUIRED)
     product_name: String,                   // Product name (REQUIRED)
     product_category: String DEFAULT "",    // Category (electronics, clothing, etc.) - optional
     price: F64 DEFAULT 0.0,                // Product price - optional, defaults to 0.0
@@ -85,7 +85,7 @@ E::HasProductEmbedding {
 // Service Memory Node - Each service is a separate memory node
 N::BusinessServiceMemory {
     business_id: String,                    // Business identifier (REQUIRED)
-    service_id: String,                     // Unique service identifier (REQUIRED)
+    INDEX service_id: String,               // Unique service identifier (REQUIRED)
     service_name: String,                   // Service name (REQUIRED)
     service_category: String DEFAULT "",    // Category (consulting, repair, etc.) - optional
     price: F64 DEFAULT 0.0,                // Service price - optional, defaults to 0.0
@@ -134,7 +134,7 @@ E::HasServiceEmbedding {
 // Location Memory Node - Business location information
 N::BusinessLocationMemory {
     business_id: String,                    // Business identifier (REQUIRED)
-    location_id: String,                    // Unique location identifier (REQUIRED)
+    INDEX location_id: String,              // Unique location identifier (REQUIRED)
     location_name: String DEFAULT "",       // Location name - optional
     address: String DEFAULT "",             // Full address - optional
     city: String DEFAULT "",               // City - optional
@@ -329,7 +329,7 @@ E::HasPolicyEmbedding {
 // Business Event Memory Node - Business events and promotions
 N::BusinessEventMemory {
     business_id: String,          // Business identifier
-    event_id: String,            // Unique event identifier
+    INDEX event_id: String,       // Unique event identifier
     event_name: String,          // Event name
     event_type: String DEFAULT "",             // Event type - optional, empty if not specified
     start_date: I64 DEFAULT NOW,               // Event start timestamp - optional, defaults to now
@@ -377,7 +377,7 @@ E::HasEventEmbedding {
 // Business Information Memory Node - General information, documentation, manuals, guides
 N::BusinessInformationMemory {
     business_id: String,          // Business identifier
-    info_id: String,             // Unique information identifier
+    INDEX info_id: String,             // Unique information identifier
     info_type: String DEFAULT "", // Type: documentation, manual, guide, teaching, etc. - optional
     title: String,               // Information title (REQUIRED)
     content: String DEFAULT "",   // Full content - optional
