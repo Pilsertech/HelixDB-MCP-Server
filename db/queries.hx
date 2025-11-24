@@ -1033,9 +1033,9 @@ QUERY get_business_events(business_id: String) =>
     RETURN events
 
 // Get business information
-// QUERY get_business_information(business_id: String) =>
-//     information <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
-//     RETURN information
+QUERY get_business_information(business_id: String) =>
+    information <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
+    RETURN information
 
 // ============================================================================
 // INFORMATION RELATIONSHIP QUERIES - Create Network of Knowledge

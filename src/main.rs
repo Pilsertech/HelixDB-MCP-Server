@@ -3106,12 +3106,17 @@ impl HelixMcpServer {
     // INFORMATION RELATIONSHIP TOOLS - Create Network of Knowledge
     // ========================================================================
 
-    #[tool(description = "Manage information relationships - create links between information documents and business assets to build a knowledge network. Supports: related_info, prerequisite, series, reference, info_to_product, info_to_service, info_to_location, info_to_event relationships.")]
+    #[tool(description = "Manage information relationships - create links between information documents and business assets to build a knowledge network. IDs are obtained from create_business_memory responses or query_business_memory. Valid operations: create_related (requires from_info_id, to_info_id), create_prerequisite (requires from_info_id, to_info_id), create_series (requires from_info_id, to_info_id, series_name), create_reference (requires from_info_id, to_info_id), link_to_product (requires from_info_id, target_business_id as product_id), link_to_service (requires from_info_id, target_business_id as service_id), link_to_location (requires from_info_id, target_business_id as location_id), link_to_event (requires from_info_id, target_business_id as event_id), get_related (requires from_info_id), get_prerequisites (requires from_info_id), get_series (requires series_name), get_product_info (requires target_business_id as business_id), get_service_info (requires target_business_id as business_id).")]
     async fn manage_information_relationships(&self, params: Parameters<ManageInformationRelationshipsParam>) -> Result<CallToolResult, McpError> {
         let operation = &params.0.operation;
 
         match operation.as_str() {
             "create_related" => {
+                if params.0.from_info_id.is_none() || params.0.to_info_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and to_info_id are required for create_related operation"
+                    })));
+                }
                 let payload = json!({
                     "from_info_id": params.0.from_info_id.as_ref().unwrap(),
                     "to_info_id": params.0.to_info_id.as_ref().unwrap(),
@@ -3131,6 +3136,11 @@ impl HelixMcpServer {
                 }
             },
             "create_prerequisite" => {
+                if params.0.from_info_id.is_none() || params.0.to_info_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and to_info_id are required for create_prerequisite operation"
+                    })));
+                }
                 let payload = json!({
                     "prerequisite_info_id": params.0.from_info_id.as_ref().unwrap(),
                     "dependent_info_id": params.0.to_info_id.as_ref().unwrap(),
@@ -3148,6 +3158,11 @@ impl HelixMcpServer {
                 }
             },
             "create_series" => {
+                if params.0.from_info_id.is_none() || params.0.to_info_id.is_none() || params.0.series_name.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id, to_info_id, and series_name are required for create_series operation"
+                    })));
+                }
                 let payload = json!({
                     "from_info_id": params.0.from_info_id.as_ref().unwrap(),
                     "to_info_id": params.0.to_info_id.as_ref().unwrap(),
@@ -3166,6 +3181,11 @@ impl HelixMcpServer {
                 }
             },
             "create_reference" => {
+                if params.0.from_info_id.is_none() || params.0.to_info_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and to_info_id are required for create_reference operation"
+                    })));
+                }
                 let payload = json!({
                     "referencing_info_id": params.0.from_info_id.as_ref().unwrap(),
                     "referenced_info_id": params.0.to_info_id.as_ref().unwrap(),
@@ -3184,6 +3204,11 @@ impl HelixMcpServer {
                 }
             },
             "link_to_product" => {
+                if params.0.from_info_id.is_none() || params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and target_business_id are required for link_to_product operation"
+                    })));
+                }
                 let payload = json!({
                     "info_id": params.0.from_info_id.as_ref().unwrap(),
                     "product_id": params.0.target_business_id.as_ref().unwrap(),
@@ -3202,6 +3227,11 @@ impl HelixMcpServer {
                 }
             },
             "link_to_service" => {
+                if params.0.from_info_id.is_none() || params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and target_business_id are required for link_to_service operation"
+                    })));
+                }
                 let payload = json!({
                     "info_id": params.0.from_info_id.as_ref().unwrap(),
                     "service_id": params.0.target_business_id.as_ref().unwrap(),
@@ -3220,6 +3250,11 @@ impl HelixMcpServer {
                 }
             },
             "link_to_location" => {
+                if params.0.from_info_id.is_none() || params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and target_business_id are required for link_to_location operation"
+                    })));
+                }
                 let payload = json!({
                     "info_id": params.0.from_info_id.as_ref().unwrap(),
                     "location_id": params.0.target_business_id.as_ref().unwrap(),
@@ -3238,6 +3273,11 @@ impl HelixMcpServer {
                 }
             },
             "link_to_event" => {
+                if params.0.from_info_id.is_none() || params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id and target_business_id are required for link_to_event operation"
+                    })));
+                }
                 let payload = json!({
                     "info_id": params.0.from_info_id.as_ref().unwrap(),
                     "event_id": params.0.target_business_id.as_ref().unwrap(),
@@ -3256,6 +3296,11 @@ impl HelixMcpServer {
                 }
             },
             "get_related" => {
+                if params.0.from_info_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id is required for get_related operation"
+                    })));
+                }
                 let payload = json!({"info_id": params.0.from_info_id.as_ref().unwrap()});
                 match self.helix_client.query("get_related_information", payload).await {
                     Ok(result) => Ok(CallToolResult::structured(json!({
@@ -3268,6 +3313,11 @@ impl HelixMcpServer {
                 }
             },
             "get_prerequisites" => {
+                if params.0.from_info_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "from_info_id is required for get_prerequisites operation"
+                    })));
+                }
                 let payload = json!({"info_id": params.0.from_info_id.as_ref().unwrap()});
                 match self.helix_client.query("get_prerequisites_for_info", payload).await {
                     Ok(result) => Ok(CallToolResult::structured(json!({
@@ -3280,6 +3330,11 @@ impl HelixMcpServer {
                 }
             },
             "get_series" => {
+                if params.0.series_name.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "series_name is required for get_series operation"
+                    })));
+                }
                 let payload = json!({"series_name": params.0.series_name.as_ref().unwrap()});
                 match self.helix_client.query("get_series_information", payload).await {
                     Ok(result) => Ok(CallToolResult::structured(json!({
@@ -3292,6 +3347,11 @@ impl HelixMcpServer {
                 }
             },
             "get_product_info" => {
+                if params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "target_business_id is required for get_product_info operation"
+                    })));
+                }
                 let payload = json!({"product_id": params.0.target_business_id.as_ref().unwrap()});
                 match self.helix_client.query("get_product_information", payload).await {
                     Ok(result) => Ok(CallToolResult::structured(json!({
@@ -3304,6 +3364,11 @@ impl HelixMcpServer {
                 }
             },
             "get_service_info" => {
+                if params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "target_business_id is required for get_service_info operation"
+                    })));
+                }
                 let payload = json!({"service_id": params.0.target_business_id.as_ref().unwrap()});
                 match self.helix_client.query("get_service_information", payload).await {
                     Ok(result) => Ok(CallToolResult::structured(json!({
