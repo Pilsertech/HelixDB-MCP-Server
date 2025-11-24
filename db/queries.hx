@@ -1042,21 +1042,21 @@ QUERY get_business_events(business_id: String) =>
 // ============================================================================
 
 // Link two information documents as related
-QUERY link_related_information(
-    from_info_id: String,
-    to_info_id: String,
-    relationship_type: String,
-    strength: I32,
-    notes: String
-) =>
-    from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
-    to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
-    edge <- AddE<RelatedInformation>({
-        relationship_type: relationship_type,
-        strength: strength,
-        notes: notes
-    })::From(from_info)::To(to_info)
-    RETURN edge
+// QUERY link_related_information(
+//     from_info_id: String,
+//     to_info_id: String,
+//     relationship_type: String,
+//     strength: I32,
+//     notes: String
+// ) =>
+//     from_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(from_info_id))
+//     to_info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(to_info_id))
+//     edge <- AddE<RelatedInformation>({
+//         relationship_type: relationship_type,
+//         strength: strength,
+//         notes: notes
+//     })::From(from_info)::To(to_info)
+//     RETURN edge
 
 // Create prerequisite relationship between information documents
 // QUERY link_prerequisite_information(
