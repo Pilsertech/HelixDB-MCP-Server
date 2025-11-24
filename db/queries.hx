@@ -1431,18 +1431,21 @@ QUERY delete_all_business_events(business_id: String) =>
 // BUSINESS INFORMATION DELETES
 // ============================================================================
 
-// QUERY delete_information(info_id: String) =>
-//     DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     RETURN "Deleted information"
+// UNCOMMENTED FOR TESTING - delete_information
+QUERY delete_information(info_id: String) =>
+    DROP N<BusinessInformationMemory>({info_id: info_id})
+    RETURN "Deleted information"
 
-// QUERY delete_information_with_embedding(info_id: String) =>
-//     DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))::Out<HasInformationEmbedding>
-//     DROP N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     RETURN "Deleted information and embedding"
+// UNCOMMENTED FOR TESTING - delete_information_with_embedding
+QUERY delete_information_with_embedding(info_id: String) =>
+    DROP N<BusinessInformationMemory>({info_id: info_id})::Out<HasInformationEmbedding>
+    DROP N<BusinessInformationMemory>({info_id: info_id})
+    RETURN "Deleted information and embedding"
 
-// QUERY delete_all_business_information(business_id: String) =>
-//     DROP N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))
-//     RETURN "Deleted all information for business"
+// UNCOMMENTED FOR TESTING - delete_all_business_information
+QUERY delete_all_business_information(business_id: String) =>
+    DROP N<BusinessInformationMemory>({business_id: business_id})
+    RETURN "Deleted all information for business"
 
 // ============================================================================
 // CUSTOMER BEHAVIOR DELETES
@@ -2387,20 +2390,21 @@ QUERY update_business_event_memory(
     edge <- AddE<HasEventEmbedding>({created_at: timestamp})::From(updated)::To(vec)
     RETURN updated
 
-// QUERY update_business_information_memory(
-//     business_id: String,
-//     info_id: String,
-//     composite_text: String,
-//     new_embedding: [F64],
-//     timestamp: I64
-// ) =>
-//     memory <- N<BusinessInformationMemory>::WHERE(_::{business_id}::EQ(business_id))::WHERE(_::{info_id}::EQ(info_id))
-//     updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
-//     DROP memory::Out<HasInformationEmbedding>
-//     DROP memory::OutE<HasInformationEmbedding>
-//     vec <- AddV<BusinessInformationEmbedding>(new_embedding, {composite_embedding_text: composite_text})
-//     edge <- AddE<HasInformationEmbedding>({created_at: timestamp})::From(updated)::To(vec)
-//     RETURN updated
+// UNCOMMENTED FOR TESTING - update_business_information_memory
+QUERY update_business_information_memory(
+    business_id: String,
+    info_id: String,
+    composite_text: String,
+    new_embedding: [F64],
+    timestamp: I64
+) =>
+    memory <- N<BusinessInformationMemory>({info_id: info_id})
+    updated <- memory::UPDATE({text_description: composite_text, updated_at: timestamp})
+    DROP memory::Out<HasInformationEmbedding>
+    DROP memory::OutE<HasInformationEmbedding>
+    vec <- AddV<BusinessInformationEmbedding>(new_embedding, {composite_embedding_text: composite_text})
+    edge <- AddE<HasInformationEmbedding>({created_at: timestamp})::From(updated)::To(vec)
+    RETURN updated
 
 // Test File: Update Customer Preference Memory
 // Status: Ready for validation

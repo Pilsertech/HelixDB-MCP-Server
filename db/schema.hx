@@ -376,7 +376,7 @@ E::HasEventEmbedding {
 
 // Business Information Memory Node - General information, documentation, manuals, guides
 N::BusinessInformationMemory {
-    business_id: String,          // Business identifier
+    INDEX business_id: String,          // Business identifier
     INDEX info_id: String,             // Unique information identifier
     info_type: String DEFAULT "", // Type: documentation, manual, guide, teaching, etc. - optional
     title: String,               // Information title (REQUIRED)
