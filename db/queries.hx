@@ -1167,50 +1167,58 @@ QUERY get_related_information(info_id: String) =>
     related <- info::Out<RelatedInformation>
     RETURN related
 
-// QUERY get_prerequisites_for_info(info_id: String) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     prereqs <- info::In<PrerequisiteFor>
-//     RETURN prereqs
+// UNCOMMENTED FOR TESTING - get_prerequisites_for_info
+QUERY get_prerequisites_for_info(info_id: String) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    prereqs <- info::In<PrerequisiteFor>
+    RETURN prereqs
 
-// QUERY get_dependent_information(info_id: String) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     dependents <- info::Out<PrerequisiteFor>
-//     RETURN dependents
+// UNCOMMENTED FOR TESTING - get_dependent_information
+QUERY get_dependent_information(info_id: String) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    dependents <- info::Out<PrerequisiteFor>
+    RETURN dependents
 
-// QUERY get_series_information(series_name: String) =>
-//     series <- N<BusinessInformationMemory>::OutE<PartOfSeries>::WHERE(_::{series_name}::EQ(series_name))
-//     RETURN series
+// UNCOMMENTED FOR TESTING - get_series_information
+QUERY get_series_information(series_name: String) =>
+    series <- N<BusinessInformationMemory>::OutE<PartOfSeries>::WHERE(_::{series_name}::EQ(series_name))
+    RETURN series
 
-// QUERY get_information_references(info_id: String) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     refs <- info::Out<References>
-//     RETURN refs
+// UNCOMMENTED FOR TESTING - get_information_references
+QUERY get_information_references(info_id: String) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    references <- info::Out<References>
+    RETURN references
 
-// QUERY get_referenced_by_info(info_id: String) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     refs <- info::In<References>
-//     RETURN refs
+// UNCOMMENTED FOR TESTING - get_referenced_by_info
+QUERY get_referenced_by_info(info_id: String) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    references <- info::In<References>
+    RETURN references
 
-// Query information linked to business assets
-// QUERY get_product_information(product_id: String) =>
-//     product <- N<BusinessProductMemory>::WHERE(_::{product_id}::EQ(product_id))
-//     info <- product::In<InformationAboutProduct>
-//     RETURN info
+// UNCOMMENTED FOR TESTING - get_product_information
+QUERY get_product_information(product_id: String) =>
+    product <- N<BusinessProductMemory>({product_id: product_id})
+    info <- product::In<InformationAboutProduct>
+    RETURN info
 
-// QUERY get_service_information(service_id: String) =>
-//     service <- N<BusinessServiceMemory>::WHERE(_::{service_id}::EQ(service_id))
-//     info <- service::In<InformationAboutService>
-//     RETURN info
+// UNCOMMENTED FOR TESTING - get_service_information
+QUERY get_service_information(service_id: String) =>
+    service <- N<BusinessServiceMemory>({service_id: service_id})
+    info <- service::In<InformationAboutService>
+    RETURN info
 
-// QUERY get_location_information(location_id: String) =>
-//     location <- N<BusinessLocationMemory>::WHERE(_::{location_id}::EQ(location_id))
-//     info <- location::In<InformationForLocation>
-//     RETURN info
+// UNCOMMENTED FOR TESTING - get_location_information
+QUERY get_location_information(location_id: String) =>
+    location <- N<BusinessLocationMemory>({location_id: location_id})
+    info <- location::In<InformationForLocation>
+    RETURN info
 
-// QUERY get_event_information(event_id: String) =>
-//     event <- N<BusinessEventMemory>::WHERE(_::{event_id}::EQ(event_id))
-//     info <- event::In<InformationForEvent>
-//     RETURN info
+// UNCOMMENTED FOR TESTING - get_event_information
+QUERY get_event_information(event_id: String) =>
+    event <- N<BusinessEventMemory>({event_id: event_id})
+    info <- event::In<InformationForEvent>
+    RETURN info
 
 // ============================================================================
 // ✅ ALL CREATE QUERIES IMPLEMENTED
