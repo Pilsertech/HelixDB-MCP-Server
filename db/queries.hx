@@ -1162,10 +1162,10 @@ QUERY link_information_to_event(
     RETURN edge
 
 // Query information relationships
-// QUERY get_related_information(info_id: String) =>
-//     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
-//     related <- info::Out<RelatedInformation>
-//     RETURN related
+QUERY get_related_information(info_id: String) =>
+    info <- N<BusinessInformationMemory>({info_id: info_id})
+    related <- info::Out<RelatedInformation>
+    RETURN related
 
 // QUERY get_prerequisites_for_info(info_id: String) =>
 //     info <- N<BusinessInformationMemory>::WHERE(_::{info_id}::EQ(info_id))
