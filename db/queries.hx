@@ -1213,21 +1213,25 @@ QUERY link_information_to_event(
 //     RETURN info
 
 // ============================================================================
-// TODO: ADD CREATE QUERIES FOR REMAINING MEMORY TYPES
-// The following CREATE queries need to be added once helix check validates them:
-// - add_customer_behavior_memory
-// - add_customer_desire_memory
-// - add_customer_rule_memory
-// - add_customer_feedback_memory
-// - add_business_service_memory
-// - add_business_location_memory
-// - add_business_hours_memory
-// - add_business_social_memory
-// - add_business_policy_memory
-// - add_business_event_memory
+// ✅ ALL CREATE QUERIES IMPLEMENTED
+// All memory creation queries are now implemented and working:
+// Business Memory Types:
+// - add_business_product_memory ✅
+// - add_business_service_memory ✅
+// - add_business_location_memory ✅
+// - add_business_hours_memory ✅
+// - add_business_social_media_memory ✅
+// - add_business_policy_memory ✅
+// - add_business_event_memory ✅
+// - add_business_information_memory ✅
 //
-// Note: These queries are triggering an internal HelixDB compiler panic.
-// This appears to be a bug in HelixDB's query validator.
+// Customer Memory Types:
+// - add_customer_behavior_memory ✅
+// - add_customer_preference_memory ✅
+// - add_customer_desire_memory ✅
+// - add_customer_rule_memory ✅
+// - add_customer_feedback_memory ✅
+// - add_customer_communication_memory ✅
 // ============================================================================
 // ============================================================================
 // COMPLETE UPDATE QUERIES - All Memory Types
