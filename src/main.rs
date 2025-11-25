@@ -377,6 +377,14 @@ struct ManageInformationRelationshipsParam {
     notes: Option<String>,              // Additional notes
 }
 
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+struct QueryInformationRelationshipsParam {
+    operation: String,  // "get_related", "get_prerequisites", "get_series", "get_product_info", "get_service_info", "get_location_info", "get_event_info"
+    from_info_id: Option<String>,  // For get_related, get_prerequisites
+    series_name: Option<String>,   // For get_series
+    target_business_id: Option<String>,  // For get_product_info, get_service_info, get_location_info, get_event_info
+}
+
 #[derive(Clone)]
 pub struct HelixMcpServer {
     helix_client: Arc<HelixClient>,
@@ -3109,8 +3117,8 @@ impl HelixMcpServer {
     // INFORMATION RELATIONSHIP TOOLS - Create Network of Knowledge
     // ========================================================================
 
-    #[tool(description = "Manage information relationships - create links between information documents and business assets to build a knowledge network. IDs are obtained from create_business_memory responses or query_business_memory. Valid operations: create_related (requires from_info_id, to_info_id), create_prerequisite (requires from_info_id, to_info_id), create_series (requires from_info_id, to_info_id, series_name), create_reference (requires from_info_id, to_info_id), link_to_product (requires from_info_id, target_business_id as product_id), link_to_service (requires from_info_id, target_business_id as service_id), link_to_location (requires from_info_id, target_business_id as location_id), link_to_event (requires from_info_id, target_business_id as event_id). Query operations (get_related, get_prerequisites, get_series, get_product_info, get_service_info) are not yet implemented.")]
-    async fn manage_information_relationships(&self, params: Parameters<ManageInformationRelationshipsParam>) -> Result<CallToolResult, McpError> {
+    #[tool(description = "Create information relationships - create links between information documents and business assets to build a knowledge network. IDs are obtained from create_business_memory responses or query_business_memory.\n\nParameters:\n- from_info_id: ID of the source information document\n- to_info_id: ID of the target information document\n- target_business_id: ID of the business asset (product/service/location/event)\n- series_name: Name of the series for create_series operation\n\nValid operations:\n- create_related: requires from_info_id and to_info_id\n- create_prerequisite: requires from_info_id and to_info_id\n- create_series: requires from_info_id, to_info_id, and series_name\n- create_reference: requires from_info_id and to_info_id\n- link_to_product: requires from_info_id and target_business_id (containing product ID)\n- link_to_service: requires from_info_id and target_business_id (containing service ID)\n- link_to_location: requires from_info_id and target_business_id (containing location ID)\n- link_to_event: requires from_info_id and target_business_id (containing event ID)")]
+    async fn create_information_relationships(&self, params: Parameters<ManageInformationRelationshipsParam>) -> Result<CallToolResult, McpError> {
         let operation = &params.0.operation;
 
         match operation.as_str() {
@@ -3298,6 +3306,21 @@ impl HelixMcpServer {
                     })))
                 }
             },
+            _ => Ok(CallToolResult::structured_error(json!({
+                "error": format!("Invalid operation: {}. Valid operations: create_related, create_prerequisite, create_series, create_reference, link_to_product, link_to_service, link_to_location, link_to_event", operation)
+            })))
+        }
+    }
+
+    // ========================================================================
+    // QUERY INFORMATION RELATIONSHIPS - Retrieve Network of Knowledge
+    // ========================================================================
+
+    #[tool(description = "Query information relationships - retrieve links between information documents and business assets.\n\nParameters:\n- from_info_id: ID of the information document to query relationships for\n- series_name: Name of the series for get_series operation\n- target_business_id: ID of the business asset (product/service/location/event)\n\nValid operations:\n- get_related: requires from_info_id (returns related information documents)\n- get_prerequisites: requires from_info_id (returns prerequisite information documents)\n- get_series: requires series_name (returns all documents in the series)\n- get_product_info: requires target_business_id (containing product ID, returns linked information)\n- get_service_info: requires target_business_id (containing service ID, returns linked information)\n- get_location_info: requires target_business_id (containing location ID, returns linked information)\n- get_event_info: requires target_business_id (containing event ID, returns linked information)")]
+    async fn query_information_relationships(&self, params: Parameters<QueryInformationRelationshipsParam>) -> Result<CallToolResult, McpError> {
+        let operation = &params.0.operation;
+
+        match operation.as_str() {
             "get_related" => {
                 if params.0.from_info_id.is_none() {
                     return Ok(CallToolResult::structured_error(json!({
@@ -3383,8 +3406,42 @@ impl HelixMcpServer {
                     })))
                 }
             },
+            "get_location_info" => {
+                if params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "target_business_id is required for get_location_info operation"
+                    })));
+                }
+                let payload = json!({"location_id": params.0.target_business_id.as_ref().unwrap()});
+                match self.helix_client.query("get_location_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_location_info",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get location information: {}", e)
+                    })))
+                }
+            },
+            "get_event_info" => {
+                if params.0.target_business_id.is_none() {
+                    return Ok(CallToolResult::structured_error(json!({
+                        "error": "target_business_id is required for get_event_info operation"
+                    })));
+                }
+                let payload = json!({"event_id": params.0.target_business_id.as_ref().unwrap()});
+                match self.helix_client.query("get_event_information", payload).await {
+                    Ok(result) => Ok(CallToolResult::structured(json!({
+                        "operation": "get_event_info",
+                        "data": result
+                    }))),
+                    Err(e) => Ok(CallToolResult::structured_error(json!({
+                        "error": format!("Failed to get event information: {}", e)
+                    })))
+                }
+            },
             _ => Ok(CallToolResult::structured_error(json!({
-                "error": format!("Invalid operation: {}. Valid operations: create_related, create_prerequisite, create_series, create_reference, link_to_product, link_to_service, link_to_location, link_to_event, get_related, get_prerequisites, get_series, get_product_info, get_service_info", operation)
+                "error": format!("Invalid operation: {}. Valid operations: get_related, get_prerequisites, get_series, get_product_info, get_service_info, get_location_info, get_event_info", operation)
             })))
         }
     }
